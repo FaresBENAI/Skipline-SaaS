@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, X, QrCode, AlertCircle } from 'lucide-react';
+import { Camera, X, QrCode, AlertCircle, RotateCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const QRScannerPage: React.FC = () => {
@@ -13,6 +13,7 @@ const QRScannerPage: React.FC = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showPermissionHelp, setShowPermissionHelp] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
   useEffect(() => {
     const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -30,7 +31,7 @@ const QRScannerPage: React.FC = () => {
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [facingMode]);
 
   const startCamera = async () => {
     try {
@@ -41,9 +42,14 @@ const QRScannerPage: React.FC = () => {
         return;
       }
 
+      // Arrêter la caméra précédente si elle existe
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
       const constraints = {
         video: {
-          facingMode: isMobile ? { ideal: 'environment' } : 'user',
+          facingMode: isMobile ? { exact: facingMode } : 'user',
           width: { ideal: 1280, max: 1920 },
           height: { ideal: 720, max: 1080 }
         }
@@ -68,6 +74,13 @@ const QRScannerPage: React.FC = () => {
         setError('Aucune caméra trouvée');
       } else if (err.name === 'NotSupportedError') {
         setError('Caméra non supportée');
+      } else if (err.name === 'OverconstrainedError') {
+        // Si caméra arrière pas disponible, essayer frontale
+        if (facingMode === 'environment') {
+          setFacingMode('user');
+        } else {
+          setError(`Erreur caméra: ${err.message}`);
+        }
       } else {
         setError(`Erreur caméra: ${err.message}`);
       }
@@ -80,6 +93,10 @@ const QRScannerPage: React.FC = () => {
       setStream(null);
     }
     setIsScanning(false);
+  };
+
+  const switchCamera = () => {
+    setFacingMode(facingMode === 'environment' ? 'user' : 'environment');
   };
 
   const handleManualInput = () => {
@@ -194,17 +211,29 @@ const QRScannerPage: React.FC = () => {
           <div className="text-center">
             <h1 className="text-lg font-bold">Scanner QR</h1>
             <p className="text-sm text-white/80">
-              {isScanning ? 'Caméra active' : 'Initialisation...'}
+              {isScanning ? `Caméra ${facingMode === 'environment' ? 'arrière' : 'frontale'}` : 'Initialisation...'}
             </p>
           </div>
 
-          <button
-            onClick={handleManualInput}
-            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-            title="Test manuel"
-          >
-            <QrCode className="h-6 w-6" />
-          </button>
+          <div className="flex space-x-2">
+            {isMobile && (
+              <button
+                onClick={switchCamera}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                title="Changer de caméra"
+              >
+                <RotateCw className="h-6 w-6" />
+              </button>
+            )}
+            
+            <button
+              onClick={handleManualInput}
+              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              title="Test manuel"
+            >
+              <QrCode className="h-6 w-6" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -249,16 +278,28 @@ const QRScannerPage: React.FC = () => {
             Placez le QR code dans le cadre
           </p>
           
-          <button
-            onClick={handleManualInput}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
-          >
-            Test Manuel QR
-          </button>
+          <div className="flex space-x-3 justify-center">
+            <button
+              onClick={handleManualInput}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+            >
+              Test Manuel QR
+            </button>
+            
+            {isMobile && (
+              <button
+                onClick={switchCamera}
+                className="px-4 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              >
+                <RotateCw className="h-4 w-4" />
+                <span>Switch</span>
+              </button>
+            )}
+          </div>
           
           {isMobile && (
             <p className="text-xs text-white/60 mt-3">
-              📱 Permissions caméra requises sur mobile
+              📱 Caméra {facingMode === 'environment' ? 'arrière' : 'frontale'} active
             </p>
           )}
         </div>
