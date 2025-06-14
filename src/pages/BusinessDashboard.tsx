@@ -9,18 +9,20 @@ import {
   Clock,
   Bell,
   LogOut,
-  AlertCircle,
   CheckCircle,
-  Wifi,
-  User
+  Download,
+  Copy,
+  Eye
 } from 'lucide-react'
+import QRCodeLib from 'qrcode'
 
 interface Company {
   id: string
   name: string
-  description: string | null
+  description: string | null  
   owner_id: string
   is_active: boolean
+  company_qr_code: string | null
   created_at: string
 }
 
@@ -50,122 +52,88 @@ const BusinessDashboard = () => {
   const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateQueue, setShowCreateQueue] = useState(false)
-  const [manualQr, setManualQr] = useState<string>('')
+  const [companyQrUrl, setCompanyQrUrl] = useState<string>('')
+  const [showQrModal, setShowQrModal] = useState(false)
   const [error, setError] = useState<string>('')
-  const [creating, setCreating] = useState(false)
-  const [profileStatus, setProfileStatus] = useState<string>('')
   
   // Formulaires
-  const [companyForm, setCompanyForm] = useState({ name: '', description: '' })
   const [queueForm, setQueueForm] = useState({ name: '' })
 
   useEffect(() => {
-    console.log('🚀 BusinessDashboard démarré')
     if (user) {
-      checkAndCreateProfile()
+      fetchCompany()
     }
   }, [user])
 
   useEffect(() => {
     if (company) {
       fetchQueues()
+      if (company.company_qr_code) {
+        generateCompanyQR(company.company_qr_code)
+      } else {
+        // Si pas de QR code, le générer
+        generateMissingQR()
+      }
     }
   }, [company])
 
   useEffect(() => {
     if (selectedQueue) {
       fetchQueueEntries()
+      const interval = setInterval(fetchQueueEntries, 5000)
+      return () => clearInterval(interval)
     }
   }, [selectedQueue])
 
-  const checkAndCreateProfile = async () => {
-    try {
-      console.log('👤 Vérification profil pour user:', user?.id)
-      
-      // Vérifier si le profil existe
-      const { data: existingProfile, error: checkError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-
-      console.log('📊 Profil existant:', { data: existingProfile, error: checkError })
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('❌ Erreur vérification profil:', checkError)
-        setProfileStatus(`❌ Erreur vérification: ${checkError.message}`)
-        return
-      }
-
-      // Si pas de profil, le créer
-      if (!existingProfile || existingProfile.length === 0) {
-        console.log('🛠️ Création du profil manquant...')
-        setProfileStatus('🔧 Création du profil en cours...')
-        
-        const qrCode = `SKIPLINE_${user?.id?.replace(/-/g, '').substring(0, 8).toUpperCase()}_${Date.now()}`
-        
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: user?.id,
-              email: user?.email!,
-              full_name: user?.user_metadata?.full_name || null,
-              user_type: user?.user_metadata?.user_type || 'business',
-              qr_code: qrCode
-            }
-          ])
-          .select()
-
-        if (createError) {
-          console.error('❌ Erreur création profil:', createError)
-          setProfileStatus(`❌ Erreur création profil: ${createError.message}`)
-          setError(`Impossible de créer le profil: ${createError.message}`)
-          return
-        }
-
-        console.log('✅ Profil créé:', newProfile)
-        setProfileStatus('✅ Profil créé avec succès')
-      } else {
-        console.log('✅ Profil existant trouvé')
-        setProfileStatus('✅ Profil existant')
-      }
-
-      // Maintenant chercher l'entreprise
-      await fetchCompany()
-
-    } catch (error) {
-      console.error('💥 Erreur checkAndCreateProfile:', error)
-      setProfileStatus(`💥 Erreur: ${error}`)
-      setError(`Erreur profil: ${error}`)
-    }
-  }
-
   const fetchCompany = async () => {
     try {
-      console.log('🏢 Recherche entreprise pour user:', user?.id)
-      
       const { data, error } = await supabase
         .from('companies')
         .select('*')
         .eq('owner_id', user?.id)
 
-      console.log('📊 Réponse companies:', { data, error })
-
       if (error) {
-        console.error('❌ Erreur récupération entreprise:', error)
-        setError(`Erreur recherche entreprise: ${error.message}`)
+        setError(`Erreur: ${error.message}`)
         return
       }
 
       const companyData = data && data.length > 0 ? data[0] : null
-      console.log('🏢 Entreprise trouvée:', companyData)
+      console.log('🏢 Entreprise récupérée:', companyData)
       setCompany(companyData)
       
     } catch (error) {
-      console.error('💥 Erreur fetchCompany:', error)
       setError(`Erreur: ${error}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const generateMissingQR = async () => {
+    if (!company) return
+    
+    try {
+      console.log('🔧 Génération QR manquant pour entreprise:', company.id)
+      
+      const qrCode = `COMPANY_${company.id.replace(/-/g, '').substring(0, 8).toUpperCase()}_${Date.now()}`
+      
+      const { data, error } = await supabase
+        .from('companies')
+        .update({ company_qr_code: qrCode })
+        .eq('id', company.id)
+        .select()
+
+      if (error) {
+        console.error('❌ Erreur génération QR:', error)
+        return
+      }
+
+      if (data && data.length > 0) {
+        console.log('✅ QR généré:', qrCode)
+        setCompany(data[0])
+        generateCompanyQR(qrCode)
+      }
+    } catch (error) {
+      console.error('💥 Erreur generateMissingQR:', error)
     }
   }
 
@@ -179,13 +147,13 @@ const BusinessDashboard = () => {
         .eq('company_id', company.id)
 
       if (error) {
-        console.error('❌ Erreur récupération files:', error)
+        console.error('Erreur récupération files:', error)
         return
       }
 
       setQueues(data || [])
     } catch (error) {
-      console.error('💥 Erreur fetchQueues:', error)
+      console.error('Erreur fetchQueues:', error)
     }
   }
 
@@ -214,78 +182,19 @@ const BusinessDashboard = () => {
     }
   }
 
-  const createCompany = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    console.log('🛠️ Début création entreprise')
-    
-    if (!companyForm.name.trim()) {
-      setError('Le nom de l\'entreprise est requis')
-      return
-    }
-
-    setCreating(true)
-    setError('')
-    
+  const generateCompanyQR = async (qrCode: string) => {
     try {
-      // Vérifier encore une fois que le profil existe
-      const { data: profileCheck } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user?.id)
-        .single()
-
-      if (!profileCheck) {
-        setError('Profil manquant. Rechargez la page.')
-        return
-      }
-
-      const companyData = {
-        name: companyForm.name.trim(),
-        description: companyForm.description.trim() || null,
-        owner_id: user?.id
-      }
-      
-      console.log('📤 Création entreprise:', companyData)
-      
-      const { data, error } = await supabase
-        .from('companies')
-        .insert([companyData])
-        .select()
-
-      console.log('📨 Réponse création:', { data, error })
-
-      if (error) {
-        console.error('❌ Erreur création entreprise:', error)
-        
-        let errorMessage = 'Erreur inconnue'
-        
-        if (error.message.includes('foreign key')) {
-          errorMessage = 'Erreur de profil utilisateur. Rechargez la page et réessayez.'
-        } else if (error.message.includes('duplicate')) {
-          errorMessage = 'Une entreprise existe déjà pour cet utilisateur.'
-        } else {
-          errorMessage = error.message
+      const qrUrl = await QRCodeLib.toDataURL(qrCode, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#1e40af',
+          light: '#ffffff'
         }
-        
-        setError(errorMessage)
-        return
-      }
-
-      if (!data || data.length === 0) {
-        setError('Aucune donnée retournée')
-        return
-      }
-
-      console.log('✅ Entreprise créée:', data[0])
-      setCompany(data[0])
-      setCompanyForm({ name: '', description: '' })
-      
-    } catch (error: any) {
-      console.error('💥 Erreur catch:', error)
-      setError(error.message || error.toString())
-    } finally {
-      setCreating(false)
+      })
+      setCompanyQrUrl(qrUrl)
+    } catch (error) {
+      console.error('Erreur génération QR entreprise:', error)
     }
   }
 
@@ -318,75 +227,10 @@ const BusinessDashboard = () => {
     }
   }
 
-  const addToQueue = async (qrCode: string) => {
-    if (!selectedQueue) {
-      alert('Veuillez sélectionner une file d\'attente')
-      return
-    }
-
-    if (!qrCode.trim()) {
-      alert('Code QR vide')
-      return
-    }
-
-    try {
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, user_type')
-        .eq('qr_code', qrCode.trim())
-        .eq('user_type', 'client')
-        .single()
-
-      if (userError || !userData) {
-        alert('QR Code invalide ou utilisateur non trouvé')
-        return
-      }
-
-      const { data: existingEntry } = await supabase
-        .from('queue_entries')
-        .select('id')
-        .eq('queue_id', selectedQueue.id)
-        .eq('user_id', userData.id)
-        .in('status', ['waiting', 'called'])
-        .maybeSingle()
-
-      if (existingEntry) {
-        alert(`${userData.full_name || userData.email} est déjà dans cette file d'attente`)
-        return
-      }
-
-      const { data: lastEntry } = await supabase
-        .from('queue_entries')
-        .select('position')
-        .eq('queue_id', selectedQueue.id)
-        .order('position', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      const newPosition = (lastEntry?.position || 0) + 1
-
-      const { error: insertError } = await supabase
-        .from('queue_entries')
-        .insert([
-          {
-            queue_id: selectedQueue.id,
-            user_id: userData.id,
-            position: newPosition,
-            status: 'waiting'
-          }
-        ])
-
-      if (insertError) throw insertError
-
-      alert(`✅ ${userData.full_name || userData.email} ajouté(e) à la position ${newPosition}`)
-      
-      fetchQueueEntries()
-      setManualQr('')
-
-    } catch (error) {
-      console.error('Erreur ajout à la file:', error)
-      alert('Erreur lors de l\'ajout à la file d\'attente')
-    }
+  const addToQueueByCompanyQR = async (companyQrCode: string, userId: string) => {
+    // Cette fonction sera appelée quand un client scanne le QR
+    // Pour l'instant, on la garde pour référence
+    console.log('Client scan QR:', { companyQrCode, userId })
   }
 
   const callNext = async () => {
@@ -433,139 +277,52 @@ const BusinessDashboard = () => {
     }
   }
 
+  const copyQrCode = () => {
+    if (company?.company_qr_code) {
+      navigator.clipboard.writeText(company.company_qr_code)
+      alert('Code QR copié dans le presse-papiers !')
+    }
+  }
+
+  const downloadQR = () => {
+    if (companyQrUrl) {
+      const link = document.createElement('a')
+      link.download = `qr-${company?.name || 'entreprise'}.png`
+      link.href = companyQrUrl
+      link.click()
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Initialisation...</p>
-          <p className="mt-2 text-sm text-gray-500">{profileStatus}</p>
+          <p className="mt-4 text-gray-600">Chargement...</p>
         </div>
       </div>
     )
   }
 
-  // Pas d'entreprise créée
   if (!company) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-3">
-                <Building2 className="w-8 h-8 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">Dashboard Entreprise</h1>
-              </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">{user?.email}</span>
-                <button
-                  onClick={signOut}
-                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Déconnexion</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="max-w-2xl mx-auto px-4 py-16">
-          {/* Status profil */}
-          <div className={`border rounded-lg p-4 mb-6 ${
-            profileStatus.includes('✅') 
-              ? 'bg-green-50 border-green-200' 
-              : profileStatus.includes('🔧')
-              ? 'bg-yellow-50 border-yellow-200'
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <div className="flex items-center">
-              <User className="w-5 h-5 mr-2" />
-              <p className="text-sm font-medium">{profileStatus}</p>
-            </div>
-          </div>
-
-          <div className="text-center mb-8">
-            <Building2 className="w-20 h-20 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Créez votre entreprise
-            </h2>
-            <p className="text-gray-600">
-              Votre profil est configuré. Créez maintenant votre entreprise !
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-            <form onSubmit={createCompany} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom de l'entreprise *
-                </label>
-                <input
-                  type="text"
-                  value={companyForm.name}
-                  onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Restaurant Le Gourmet"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={companyForm.description}
-                  onChange={(e) => setCompanyForm({ ...companyForm, description: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Description de votre entreprise..."
-                  rows={4}
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-                    <div>
-                      <p className="text-red-800 font-medium">Erreur de création</p>
-                      <p className="text-red-700 text-sm mt-1">{error}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={creating || !companyForm.name.trim() || !profileStatus.includes('✅')}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium py-3 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creating ? (
-                  <span className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Création en cours...
-                  </span>
-                ) : (
-                  'Créer mon entreprise'
-                )}
-              </button>
-
-              {!profileStatus.includes('✅') && (
-                <p className="text-sm text-yellow-600 text-center">
-                  ⏳ En attente de la configuration du profil...
-                </p>
-              )}
-            </form>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Erreur: Entreprise non trouvée</p>
+          <button
+            onClick={signOut}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg"
+          >
+            Déconnexion
+          </button>
         </div>
       </div>
     )
   }
 
-  // Interface principale avec entreprise
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header avec bouton QR */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -576,27 +333,49 @@ const BusinessDashboard = () => {
                 <p className="text-sm text-gray-600">Dashboard de gestion</p>
               </div>
             </div>
-            <button
-              onClick={signOut}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Déconnexion</span>
-            </button>
+            <div className="flex items-center space-x-4">
+              {/* BOUTON QR ENTREPRISE - TOUJOURS VISIBLE */}
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>QR Entreprise</span>
+              </button>
+              <button
+                onClick={signOut}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Déconnexion</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Success message */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-8">
-          <div className="flex items-center">
-            <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-            <div>
-              <h3 className="text-green-800 font-semibold">Entreprise créée avec succès !</h3>
-              <p className="text-green-700 text-sm">
-                {company.name} • Créée le {new Date(company.created_at).toLocaleDateString('fr-FR')}
-              </p>
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <CheckCircle className="w-6 h-6 text-green-600 mr-3" />
+              <div>
+                <h3 className="text-green-800 font-semibold">Entreprise créée avec succès !</h3>
+                <p className="text-green-700 text-sm">
+                  {company.name} • QR Code: {company.company_qr_code ? '✅ Généré' : '🔄 Génération...'}
+                </p>
+              </div>
+            </div>
+            <div className="text-center">
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="bg-white border-2 border-green-200 text-green-700 px-4 py-2 rounded-lg hover:bg-green-50 flex items-center space-x-2"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Voir QR</span>
+              </button>
+              <p className="text-xs text-green-600 mt-1">Pour vos clients</p>
             </div>
           </div>
         </div>
@@ -652,51 +431,63 @@ const BusinessDashboard = () => {
             {selectedQueue ? (
               <div className="space-y-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-6">{selectedQueue.name}</h2>
-
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-3">
-                      �� Ajouter un client via son code QR :
-                    </h4>
-                    <div className="flex space-x-3">
-                      <input
-                        type="text"
-                        value={manualQr}
-                        onChange={(e) => setManualQr(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Collez le code QR du client ici..."
-                      />
-                      <button
-                        onClick={() => addToQueue(manualQr)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        Ajouter
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      💡 Le client doit vous montrer son QR code depuis son dashboard
-                    </p>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-lg font-bold text-gray-900">{selectedQueue.name}</h2>
+                    <button
+                      onClick={callNext}
+                      disabled={queueEntries.filter(e => e.status === 'waiting').length === 0}
+                      className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <Bell className="w-4 h-4" />
+                      <span>Appeler suivant</span>
+                    </button>
                   </div>
 
-                  <button
-                    onClick={callNext}
-                    disabled={queueEntries.filter(e => e.status === 'waiting').length === 0}
-                    className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    <Bell className="w-4 h-4" />
-                    <span>Appeler suivant</span>
-                  </button>
+                  {/* Instructions */}
+                  <div className="bg-blue-50 rounded-xl p-4 mb-6">
+                    <h4 className="font-medium text-blue-900 mb-2">📱 Comment ajouter des clients :</h4>
+                    <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                      <li>Cliquez sur <strong>"QR Entreprise"</strong> en haut</li>
+                      <li>Affichez ce QR code aux clients</li>
+                      <li>Ils le scannent avec leur app SkipLine</li>
+                      <li>Ils apparaissent automatiquement dans cette file !</li>
+                    </ol>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {queueEntries.filter(e => e.status === 'waiting').length}
+                      </div>
+                      <div className="text-sm text-blue-600">En attente</div>
+                    </div>
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {queueEntries.filter(e => e.status === 'called').length}
+                      </div>
+                      <div className="text-sm text-yellow-600">Appelés</div>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">
+                        {queueEntries.length}
+                      </div>
+                      <div className="text-sm text-green-600">Total</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Clients ({queueEntries.length})</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">
+                    Clients dans la file ({queueEntries.length})
+                  </h3>
                   
                   {queueEntries.length === 0 ? (
                     <div className="text-center py-12">
                       <Users className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-500">Aucun client dans la file</p>
                       <p className="text-sm text-gray-400 mt-2">
-                        Utilisez le champ ci-dessus pour ajouter des clients
+                        Les clients apparaîtront ici quand ils scanneront votre QR code
                       </p>
                     </div>
                   ) : (
@@ -704,14 +495,14 @@ const BusinessDashboard = () => {
                       {queueEntries.map((entry) => (
                         <div
                           key={entry.id}
-                          className={`flex items-center justify-between p-4 rounded-lg border ${
+                          className={`flex items-center justify-between p-4 rounded-lg border-2 ${
                             entry.status === 'called' 
-                              ? 'border-yellow-200 bg-yellow-50' 
+                              ? 'border-yellow-300 bg-yellow-50' 
                               : 'border-gray-200'
                           }`}
                         >
                           <div className="flex items-center space-x-4">
-                            <div className="text-lg font-bold text-blue-600">#{entry.position}</div>
+                            <div className="text-xl font-bold text-blue-600">#{entry.position}</div>
                             <div>
                               <h4 className="font-semibold text-gray-900">
                                 {entry.user.full_name || entry.user.email}
@@ -720,20 +511,20 @@ const BusinessDashboard = () => {
                             </div>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-3">
                             {entry.status === 'waiting' && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                                 En attente
                               </span>
                             )}
                             {entry.status === 'called' && (
                               <>
-                                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                                  Appelé
+                                <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                                  🔔 Appelé
                                 </span>
                                 <button
                                   onClick={() => markServed(entry.id)}
-                                  className="text-green-600 hover:text-green-700 text-sm"
+                                  className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 text-sm"
                                 >
                                   Marquer servi
                                 </button>
@@ -754,11 +545,11 @@ const BusinessDashboard = () => {
                     Créez votre première file d'attente
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    Commencez par créer une file pour organiser vos clients
+                    Les clients pourront rejoindre cette file en scannant votre QR code
                   </p>
                   <button
                     onClick={() => setShowCreateQueue(true)}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
                   >
                     Créer une file
                   </button>
@@ -768,6 +559,75 @@ const BusinessDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal QR Code Entreprise */}
+      {showQrModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900">QR Code de votre entreprise</h3>
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="text-center">
+              {companyQrUrl ? (
+                <div>
+                  <div className="bg-white p-4 rounded-xl border-2 border-blue-200 mb-4">
+                    <img
+                      src={companyQrUrl}
+                      alt="QR Code Entreprise"
+                      className="w-full max-w-xs mx-auto"
+                    />
+                  </div>
+                  
+                  <h4 className="font-semibold text-gray-900 mb-2">{company.name}</h4>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-gray-600 mb-1">Code technique :</p>
+                    <p className="text-xs font-mono text-gray-800 break-all">
+                      {company.company_qr_code}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={copyQrCode}
+                      className="flex-1 flex items-center justify-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span>Copier</span>
+                    </button>
+                    <button
+                      onClick={downloadQR}
+                      className="flex-1 flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Télécharger</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-green-50 rounded-lg p-4 mt-4">
+                    <p className="text-sm text-green-800">
+                      <strong>💡 Comment ça marche :</strong><br />
+                      Affichez ce QR code dans votre établissement. Les clients le scannent pour rejoindre automatiquement vos files d'attente !
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Génération du QR code...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal création file */}
       {showCreateQueue && (
