@@ -1,204 +1,304 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
-import { ArrowLeft, Keyboard, Loader2, AlertCircle } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Camera, X, QrCode, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-const QRScanner: React.FC = () => {
-  const [manualInput, setManualInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const { user } = useAuth()
-  const navigate = useNavigate()
+const QRScannerPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false);
 
-  const processQRCode = async (qrCode: string) => {
-    if (!user) {
-      setError('Vous devez être connecté pour scanner un QR code')
-      return
+  useEffect(() => {
+    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(checkMobile);
+    
+    const isHTTPS = window.location.protocol === 'https:';
+    
+    if (checkMobile && !isHTTPS) {
+      setError('HTTPS requis pour la caméra sur mobile');
+      setShowPermissionHelp(true);
+      return;
     }
+    
+    startCamera();
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
+  const startCamera = async () => {
     try {
-      if (qrCode.startsWith('COMPANY_')) {
-        await joinCompanyQueue(qrCode)
+      setError('');
+      
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Caméra non supportée par ce navigateur');
+        return;
+      }
+
+      const constraints = {
+        video: {
+          facingMode: isMobile ? { ideal: 'environment' } : 'user',
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 }
+        }
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      setStream(mediaStream);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        await videoRef.current.play();
+        setIsScanning(true);
+      }
+      
+    } catch (err: any) {
+      console.error('Erreur accès caméra:', err);
+      
+      if (err.name === 'NotAllowedError') {
+        setError('Permission caméra refusée');
+        setShowPermissionHelp(true);
+      } else if (err.name === 'NotFoundError') {
+        setError('Aucune caméra trouvée');
+      } else if (err.name === 'NotSupportedError') {
+        setError('Caméra non supportée');
       } else {
-        setError('QR code non reconnu. Scannez un QR code d\'entreprise valide.')
+        setError(`Erreur caméra: ${err.message}`);
       }
-    } catch (err) {
-      console.error('Error processing QR code:', err)
-      setError('Erreur lors du traitement du QR code')
-    } finally {
-      setLoading(false)
     }
-  }
+  };
 
-  const joinCompanyQueue = async (companyQRCode: string) => {
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsScanning(false);
+  };
+
+  const handleManualInput = () => {
+    const qrContent = prompt('Entrez le contenu du QR Code :');
+    if (qrContent) {
+      handleScanResult(qrContent);
+    }
+  };
+
+  const handleScanResult = (data: string) => {
+    console.log('QR Code scanné:', data);
+    
     try {
-      console.log('🔍 Recherche entreprise avec QR:', companyQRCode)
+      stopCamera();
+
+      if (data.startsWith('http://') || data.startsWith('https://')) {
+        window.location.href = data;
+      } else if (data.includes('/join/')) {
+        const path = data.replace(/^.*?(\/join\/.*)$/, '$1');
+        navigate(path);
+      } else if (data.startsWith('SKIPLINE_COMPANY_')) {
+        const companyCode = data.replace('SKIPLINE_COMPANY_', '');
+        navigate(`/join/${companyCode}`);
+      } else if (data.startsWith('SKIPLINE_USER_')) {
+        const userId = data.replace('SKIPLINE_USER_', '');
+        console.log('QR utilisateur scanné:', userId);
+        alert('QR Code utilisateur détecté (fonctionnalité à venir)');
+        startCamera();
+      } else {
+        alert('QR Code non reconnu. Format: SKIPLINE_COMPANY_XXX');
+        startCamera();
+      }
       
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('company_qr_code', companyQRCode)
-        .single()
-
-      if (companyError || !company) {
-        setError('Entreprise non trouvée avec ce QR code')
-        return
-      }
-
-      const { data: queues, error: queueError } = await supabase
-        .from('queues')
-        .select('id, name')
-        .eq('company_id', company.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-
-      if (queueError || !queues || queues.length === 0) {
-        setError(`Aucune file active pour ${company.name}`)
-        return
-      }
-
-      const queue = queues[0]
-
-      const { data: existingEntry } = await supabase
-        .from('queue_entries')
-        .select('id')
-        .eq('queue_id', queue.id)
-        .eq('user_id', user.id)
-        .in('status', ['waiting', 'called'])
-        .single()
-
-      if (existingEntry) {
-        setError('Vous êtes déjà dans cette file d\'attente')
-        return
-      }
-
-      const { count } = await supabase
-        .from('queue_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('queue_id', queue.id)
-        .in('status', ['waiting', 'called'])
-
-      const position = (count || 0) + 1
-
-      const { error: insertError } = await supabase
-        .from('queue_entries')
-        .insert({
-          queue_id: queue.id,
-          user_id: user.id,
-          position: position,
-          status: 'waiting'
-        })
-
-      if (insertError) {
-        setError('Erreur lors de l\'ajout à la file')
-        return
-      }
-
-      setSuccess(`✅ Vous avez rejoint "${queue.name}" chez ${company.name}. Position: ${position}`)
-      
-      setTimeout(() => {
-        navigate('/dashboard', { 
-          state: { 
-            message: `Vous avez rejoint la file "${queue.name}" chez ${company.name}. Position: ${position}` 
-          }
-        })
-      }, 3000)
-
     } catch (err) {
-      console.error('Erreur joinCompanyQueue:', err)
-      setError('Erreur technique lors de l\'ajout à la file')
+      console.error('Erreur traitement QR:', err);
+      setError('Erreur lors du traitement du QR code');
     }
-  }
+  };
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!manualInput.trim()) return
-    await processQRCode(manualInput.trim())
+  const goBack = () => {
+    stopCamera();
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      navigate('/');
+    }
+  };
+
+  if (showPermissionHelp) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-4">
+        <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center mb-6">
+            <AlertCircle className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800">Permissions Caméra</h2>
+          </div>
+
+          <div className="space-y-4 mb-6">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <h3 className="font-semibold text-orange-800 mb-2">🔒 Problème détecté</h3>
+              <p className="text-sm text-orange-700">{error}</p>
+            </div>
+
+            {isMobile && window.location.protocol !== 'https:' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-800 mb-2">📱 Solution Mobile</h3>
+                <p className="text-sm text-blue-700">
+                  La caméra nécessite HTTPS sur mobile. Utilisez le test manuel ci-dessous.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={startCamera}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Réessayer Caméra
+            </button>
+            
+            <button
+              onClick={handleManualInput}
+              className="w-full bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Test Manuel QR
+            </button>
+            
+            <button
+              onClick={goBack}
+              className="w-full bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors"
+            >
+              Retour
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-4">
-      <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen bg-black relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 z-20 bg-black/50 backdrop-blur-sm p-4">
+        <div className="flex items-center justify-between text-white">
           <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+            onClick={goBack}
+            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
           >
-            <ArrowLeft size={20} />
-            Retour
+            <X className="h-6 w-6" />
           </button>
-          <h1 className="text-xl font-bold text-gray-800">Scanner QR Code</h1>
-          <div className="w-16"></div>
+          
+          <div className="text-center">
+            <h1 className="text-lg font-bold">Scanner QR</h1>
+            <p className="text-sm text-white/80">
+              {isScanning ? 'Caméra active' : 'Initialisation...'}
+            </p>
+          </div>
+
+          <button
+            onClick={handleManualInput}
+            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            title="Test manuel"
+          >
+            <QrCode className="h-6 w-6" />
+          </button>
         </div>
-
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="p-6">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Keyboard className="w-8 h-8 text-blue-600" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                Saisir le QR code de l'entreprise
-              </h2>
-              <p className="text-gray-600 text-sm">
-                Entrez le code QR affiché par l'entreprise
-              </p>
-            </div>
-            
-            <form onSubmit={handleManualSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Code QR Entreprise
-                </label>
-                <input
-                  type="text"
-                  value={manualInput}
-                  onChange={(e) => setManualInput(e.target.value)}
-                  placeholder="COMPANY_A1B2C3D4_1234567890"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-              </div>
-              
-              <button
-                type="submit"
-                disabled={loading || !manualInput.trim()}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Traitement...
-                  </>
-                ) : (
-                  'Rejoindre la file'
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-            <p className="text-red-600 text-sm">{error}</p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-600 text-sm font-medium">{success}</p>
-            <p className="text-green-600 text-xs mt-1">Redirection vers votre dashboard...</p>
-          </div>
-        )}
       </div>
-    </div>
-  )
-}
 
-export default QRScanner
+      <div className="relative w-full h-screen">
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          playsInline
+          muted
+          autoPlay
+        />
+        
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative w-64 h-64">
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+              
+              {isScanning && (
+                <div className="absolute inset-0">
+                  <div className="w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse"></div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="absolute inset-0 bg-black/40">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-64 h-64 bg-transparent border-2 border-transparent rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 z-20 bg-black/50 backdrop-blur-sm p-6">
+        <div className="text-center text-white">
+          <Camera className="h-8 w-8 mx-auto mb-2 text-blue-400" />
+          <p className="text-lg font-medium mb-2">Scanner QR SkipLine</p>
+          <p className="text-sm text-white/80 mb-4">
+            Placez le QR code dans le cadre
+          </p>
+          
+          <button
+            onClick={handleManualInput}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+          >
+            Test Manuel QR
+          </button>
+          
+          {isMobile && (
+            <p className="text-xs text-white/60 mt-3">
+              📱 Permissions caméra requises sur mobile
+            </p>
+          )}
+        </div>
+      </div>
+
+      {error && !showPermissionHelp && (
+        <div className="absolute top-20 left-4 right-4 z-30">
+          <div className="bg-red-500/90 backdrop-blur-sm text-white p-4 rounded-lg text-center">
+            <p className="font-medium">{error}</p>
+            <div className="flex space-x-2 mt-3">
+              <button
+                onClick={() => {
+                  setError('');
+                  startCamera();
+                }}
+                className="flex-1 px-4 py-2 bg-white/20 rounded-lg text-sm hover:bg-white/30 transition-colors"
+              >
+                Réessayer
+              </button>
+              <button
+                onClick={handleManualInput}
+                className="flex-1 px-4 py-2 bg-white/20 rounded-lg text-sm hover:bg-white/30 transition-colors"
+              >
+                Test Manuel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isScanning && !error && (
+        <div className="absolute inset-0 z-10 bg-black/80 flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Démarrage de la caméra...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default QRScannerPage;
