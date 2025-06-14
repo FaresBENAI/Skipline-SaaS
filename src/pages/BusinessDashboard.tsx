@@ -55,7 +55,7 @@ const BusinessDashboard = () => {
   const [showCreateQueue, setShowCreateQueue] = useState(false)
   const [companyQrUrl, setCompanyQrUrl] = useState<string>('')
   const [showQrModal, setShowQrModal] = useState(false)
-  const [qrFormat, setQrFormat] = useState<'url' | 'code'>('url') // Nouveau state
+  const [qrFormat, setQrFormat] = useState<'url' | 'code'>('url')
   
   // Formulaires
   const [queueForm, setQueueForm] = useState({ name: '' })
@@ -96,7 +96,7 @@ const BusinessDashboard = () => {
         .eq('owner_id', user?.id)
 
       if (error) {
-        setError(`Erreur: ${error.message}`)
+        console.error('Erreur récupération entreprise:', error.message)
         return
       }
 
@@ -105,7 +105,7 @@ const BusinessDashboard = () => {
       setCompany(companyData)
       
     } catch (error) {
-      setError(`Erreur: ${error}`)
+      console.error('Erreur fetchCompany:', error)
     } finally {
       setLoading(false)
     }
@@ -189,15 +189,12 @@ const BusinessDashboard = () => {
     if (!qrCode) return
 
     try {
-      // Déterminer le contenu du QR selon le format
       let qrContent = ''
       
       if (qrFormat === 'url') {
-        // Format URL complète pour scan téléphone
         const companyCode = qrCode.replace('COMPANY_', '').split('_')[0]
         qrContent = `${baseUrl}/join/${companyCode}`
       } else {
-        // Format SkipLine pour scan dans l'app
         qrContent = `SKIPLINE_${qrCode}`
       }
 
@@ -207,7 +204,7 @@ const BusinessDashboard = () => {
         width: 400,
         margin: 2,
         color: {
-          dark: qrFormat === 'url' ? '#059669' : '#1e40af', // Vert pour URL, bleu pour code
+          dark: qrFormat === 'url' ? '#059669' : '#1e40af',
           light: '#ffffff'
         }
       })
@@ -363,7 +360,6 @@ const BusinessDashboard = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              {/* BOUTON QR ENTREPRISE - TOUJOURS VISIBLE */}
               <button
                 onClick={() => setShowQrModal(true)}
                 className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
@@ -589,7 +585,7 @@ const BusinessDashboard = () => {
         </div>
       </div>
 
-      {/* Modal QR Code Entreprise AMÉLIORÉ */}
+      {/* Modal QR Code Entreprise */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -727,20 +723,21 @@ const BusinessDashboard = () => {
                   Nom de la file *
                 </label>
                 <input
-                 type="text"
-                 value={queueForm.name}
-                 onChange={(e) => setQueueForm({ name: e.target.value })}
-                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                 placeholder="Service principal"
-                 required
-               />
-             </div>
+                  type="text"
+                  value={queueForm.name}
+                  onChange={(e) => setQueueForm({ name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Service principal"
+                  required
+                />
+              </div>
 
-             <div className="flex justify-end space-x-3">
-               <button
-                 type="button"
-                 onClick={() => setShowCreateQueue(false)}
-                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateQueue(false)}
+                  className="px-4 py-2 text-gray-600 hover:
+                text-gray-800"
                >
                  Annuler
                </button>
