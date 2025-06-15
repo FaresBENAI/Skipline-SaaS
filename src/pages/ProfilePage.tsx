@@ -1,16 +1,21 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { uploadAvatar } from '../services/uploadService'
 import { ArrowLeft, User, Camera, Mail, Calendar } from 'lucide-react'
 
 const ProfilePage = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState({
     full_name: user?.user_metadata?.full_name || '',
     email: user?.email || ''
   })
+
+  const userType = user?.user_metadata?.user_type
 
   const handleSave = () => {
     // TODO: Implémenter mise à jour profil
@@ -19,14 +24,45 @@ const ProfilePage = () => {
   }
 
   const handlePhotoUpload = () => {
-    // TODO: Implémenter upload photo
-    alert('Upload photo - À implémenter')
+    fileInputRef.current?.click()
   }
 
-  const userType = user?.user_metadata?.user_type
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    setUploading(true)
+    
+    try {
+      console.log('📸 Début upload photo:', file.name)
+      await uploadAvatar(file, user.id)
+      
+      alert('✅ Photo mise à jour avec succès !')
+      
+      // Forcer le rechargement pour voir la nouvelle photo
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+      
+    } catch (error: any) {
+      console.error('❌ Erreur upload photo:', error)
+      alert(`❌ Erreur: ${error.message}`)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Input file caché */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -61,10 +97,16 @@ const ProfilePage = () => {
                 ) : (
                   <User className="w-10 h-10 text-white" />
                 )}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={handlePhotoUpload}
-                className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors"
+                disabled={uploading}
+                className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 <Camera className="w-4 h-4" />
               </button>
@@ -77,6 +119,9 @@ const ProfilePage = () => {
               <p className="text-sm text-gray-500">
                 {userType === 'business' ? 'Compte Entreprise' : 'Compte Client'}
               </p>
+              {uploading && (
+                <p className="text-xs text-blue-600 mt-1">📸 Upload en cours...</p>
+              )}
             </div>
           </div>
 
@@ -147,6 +192,16 @@ const ProfilePage = () => {
                 Modifier
               </button>
             )}
+          </div>
+
+          {/* Info upload */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-medium text-blue-900 mb-2">💡 Upload de photo :</h3>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Formats acceptés : JPG, PNG, GIF</li>
+              <li>• Taille maximum : 5MB</li>
+              <li>• Photo carrée recommandée</li>
+            </ul>
           </div>
         </div>
       </div>

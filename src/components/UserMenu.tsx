@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { uploadAvatar } from '../services/uploadService'
 import { 
   User, 
   Settings, 
@@ -8,7 +9,8 @@ import {
   ChevronDown,
   Camera,
   Bell,
-  QrCode
+  QrCode,
+  Upload
 } from 'lucide-react'
 
 interface UserMenuProps {
@@ -18,7 +20,9 @@ interface UserMenuProps {
 const UserMenu = ({ userType }: UserMenuProps) => {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -48,7 +52,6 @@ const UserMenu = ({ userType }: UserMenuProps) => {
 
   const handleMenuClick = (item: any) => {
     if (item.action === 'scanner') {
-      // Émettez un événement pour ouvrir le scanner
       window.dispatchEvent(new CustomEvent('openScanner'))
     } else if (item.path) {
       navigate(item.path)
@@ -56,13 +59,49 @@ const UserMenu = ({ userType }: UserMenuProps) => {
     setIsOpen(false)
   }
 
+  const handlePhotoUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    setUploading(true)
+    
+    try {
+      console.log('📸 Début upload photo:', file.name)
+      const avatarUrl = await uploadAvatar(file, user.id)
+      
+      // Forcer le rechargement pour voir la nouvelle photo
+      window.location.reload()
+      
+      alert('✅ Photo mise à jour avec succès !')
+      
+    } catch (error: any) {
+      console.error('❌ Erreur upload photo:', error)
+      alert(`❌ Erreur: ${error.message}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div className="relative" ref={menuRef}>
+      {/* Input file caché */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
       >
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+        <div className="relative w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
           {user?.user_metadata?.avatar_url ? (
             <img
               src={user.user_metadata.avatar_url}
@@ -71,6 +110,11 @@ const UserMenu = ({ userType }: UserMenuProps) => {
             />
           ) : (
             <User className="w-4 h-4 text-white" />
+          )}
+          {uploading && (
+            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            </div>
           )}
         </div>
         <div className="hidden md:block text-left">
@@ -89,7 +133,7 @@ const UserMenu = ({ userType }: UserMenuProps) => {
           {/* En-tête du menu */}
           <div className="px-4 py-3 border-b border-gray-100">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <div className="relative w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                 {user?.user_metadata?.avatar_url ? (
                   <img
                     src={user.user_metadata.avatar_url}
@@ -98,6 +142,11 @@ const UserMenu = ({ userType }: UserMenuProps) => {
                   />
                 ) : (
                   <User className="w-5 h-5 text-white" />
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  </div>
                 )}
               </div>
               <div>
@@ -126,15 +175,21 @@ const UserMenu = ({ userType }: UserMenuProps) => {
           {/* Section photo de profil */}
           <div className="border-t border-gray-100 py-2">
             <button
-              onClick={() => {
-                // TODO: Implémenter upload photo
-                alert('Upload photo - À implémenter')
-                setIsOpen(false)
-              }}
-              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={handlePhotoUpload}
+              disabled={uploading}
+              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              <Camera className="w-4 h-4 text-gray-400" />
-              <span>Changer la photo</span>
+              {uploading ? (
+                <>
+                  <Upload className="w-4 h-4 text-gray-400 animate-pulse" />
+                  <span>Upload en cours...</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4 text-gray-400" />
+                  <span>Changer la photo</span>
+                </>
+              )}
             </button>
           </div>
 
