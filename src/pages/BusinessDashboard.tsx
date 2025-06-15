@@ -44,10 +44,7 @@ const BusinessDashboard = () => {
   const [showQrModal, setShowQrModal] = useState(false)
   const [qrFormat, setQrFormat] = useState<'url' | 'code'>('url')
   
-  // Formulaires
   const [queueForm, setQueueForm] = useState({ name: '' })
-
-  // URL de base pour les QR codes
   const baseUrl = window.location.origin
 
   useEffect(() => {
@@ -80,7 +77,6 @@ const BusinessDashboard = () => {
       }
 
       const companyData = data && data.length > 0 ? data[0] : null
-      console.log('🏢 Entreprise récupérée:', companyData)
       setCompany(companyData)
       
     } catch (error) {
@@ -94,8 +90,6 @@ const BusinessDashboard = () => {
     if (!company) return
     
     try {
-      console.log('🔧 Génération QR manquant pour entreprise:', company.id)
-      
       const qrCode = `COMPANY_${company.id.replace(/-/g, '').substring(0, 8).toUpperCase()}_${Date.now()}`
       
       const { data, error } = await supabase
@@ -110,7 +104,6 @@ const BusinessDashboard = () => {
       }
 
       if (data && data.length > 0) {
-        console.log('✅ QR généré:', qrCode)
         setCompany(data[0])
         generateCompanyQR(qrCode)
       }
@@ -133,7 +126,6 @@ const BusinessDashboard = () => {
         return
       }
 
-      console.log('📋 Files récupérées:', data)
       setQueues(data || [])
     } catch (error) {
       console.error('Erreur fetchQueues:', error)
@@ -152,8 +144,6 @@ const BusinessDashboard = () => {
       } else {
         qrContent = `SKIPLINE_${qrCode}`
       }
-
-      console.log('🎯 Génération QR:', { format: qrFormat, content: qrContent })
 
       const qrUrl = await QRCodeLib.toDataURL(qrContent, {
         width: 400,
@@ -198,21 +188,18 @@ const BusinessDashboard = () => {
     }
   }
 
-  // Navigation vers la gestion de file AVEC DEBUGGING
+  // TEST SIMPLE avec alert
   const handleQueueClick = (queue: Queue) => {
-    console.log('🔥 CLIC SUR FILE DÉTECTÉ')
-    console.log('Queue cliquée:', queue)
-    console.log('Queue ID:', queue.id)
-    console.log('Navigate function:', navigate)
+    // TEST 1: Vérifier si le clic fonctionne
+    alert(`Clic détecté sur: ${queue.name} (ID: ${queue.id})`)
     
-    const targetPath = `/business/queue/${queue.id}`
-    console.log('🎯 Navigation vers:', targetPath)
-    
+    // TEST 2: Tenter la navigation
     try {
+      const targetPath = `/business/queue/${queue.id}`
       navigate(targetPath)
-      console.log('✅ Navigation lancée avec succès')
+      alert(`Navigation lancée vers: ${targetPath}`)
     } catch (error) {
-      console.error('❌ Erreur navigation:', error)
+      alert(`Erreur navigation: ${error}`)
     }
   }
 
@@ -277,7 +264,6 @@ const BusinessDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header avec bouton QR */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -309,7 +295,6 @@ const BusinessDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Success message */}
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-6 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -335,7 +320,6 @@ const BusinessDashboard = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Files d'attente avec DEBUGGING */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <div className="flex justify-between items-center mb-6">
@@ -350,19 +334,15 @@ const BusinessDashboard = () => {
 
               <div className="space-y-3">
                 {queues.map((queue) => (
-                  <div
+                  <button
                     key={queue.id}
-                    onClick={() => {
-                      console.log('🔥 DIV CLICKÉE - Queue:', queue.name, 'ID:', queue.id)
-                      handleQueueClick(queue)
-                    }}
-                    className="p-4 rounded-lg border-2 cursor-pointer transition-colors border-gray-200 hover:border-blue-300 hover:bg-blue-50"
-                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.05)' }}
+                    onClick={() => handleQueueClick(queue)}
+                    className="w-full p-4 rounded-lg border-2 cursor-pointer transition-colors border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-left"
                   >
                     <h3 className="font-semibold text-gray-900">{queue.name}</h3>
                     <p className="text-sm text-gray-600 mt-1">🟢 Active • Cliquez pour gérer</p>
-                    <p className="text-xs text-blue-600 mt-1">ID: {queue.id}</p>
-                  </div>
+                    <p className="text-xs text-blue-600 mt-1">TEST - ID: {queue.id.substring(0, 8)}...</p>
+                  </button>
                 ))}
 
                 {queues.length === 0 && (
@@ -381,16 +361,15 @@ const BusinessDashboard = () => {
             </div>
           </div>
 
-          {/* Espace réservé pour la sélection */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12">
               <div className="text-center">
                 <QrCode className="w-20 h-20 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Sélectionnez une file pour la gérer
+                  Mode Test - Cliquez sur une file
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  Cliquez sur une file à gauche pour voir sa gestion détaillée
+                  Une alerte devrait s'afficher quand vous cliquez sur une file
                 </p>
                 {queues.length === 0 && (
                   <button
@@ -406,7 +385,7 @@ const BusinessDashboard = () => {
         </div>
       </div>
 
-      {/* Tous les modals restent identiques... */}
+      {/* Modal QR Code simplifié */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -421,9 +400,6 @@ const BusinessDashboard = () => {
             </div>
             
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Format du QR Code :
-              </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setQrFormat('url')}
@@ -433,8 +409,7 @@ const BusinessDashboard = () => {
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold">�� URL Directe</div>
-                  <div className="text-xs text-gray-600">Pour scan téléphone</div>
+                  <div className="font-semibold">📱 URL Directe</div>
                 </button>
                 <button
                   onClick={() => setQrFormat('code')}
@@ -445,85 +420,22 @@ const BusinessDashboard = () => {
                   }`}
                 >
                   <div className="font-semibold">🔧 Code SkipLine</div>
-                  <div className="text-xs text-gray-600">Pour app SkipLine</div>
                 </button>
               </div>
             </div>
 
             <div className="text-center">
-              {companyQrUrl ? (
+              {companyQrUrl && (
                 <div>
-                  <div className={`p-6 rounded-xl border-2 mb-4 ${
-                    qrFormat === 'url' ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'
-                  }`}>
-                    <img
-                      src={companyQrUrl}
-                      alt="QR Code Entreprise"
-                      className="w-full max-w-xs mx-auto"
-                    />
-                  </div>
-                  
-                  <h4 className="font-semibold text-gray-900 mb-2">{company.name}</h4>
-                  
-                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                    <p className="text-xs text-gray-600 mb-1">
-                      {qrFormat === 'url' ? 'URL de destination :' : 'Code technique :'}
-                    </p>
-                    <p className="text-xs font-mono text-gray-800 break-all">
-                      {qrFormat === 'url' 
-                        ? `${baseUrl}/join/${company.company_qr_code?.replace('COMPANY_', '').split('_')[0]}`
-                        : `SKIPLINE_${company.company_qr_code}`
-                      }
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <button
-                      onClick={copyQrContent}
-                      className="flex items-center justify-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                    >
-                      <Copy className="w-4 h-4" />
-                      <span>Copier</span>
+                  <img src={companyQrUrl} alt="QR Code" className="w-64 mx-auto mb-4" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button onClick={copyQrContent} className="bg-gray-600 text-white px-4 py-2 rounded-lg">
+                      Copier
                     </button>
-                    <button
-                      onClick={downloadQR}
-                      className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-white ${
-                        qrFormat === 'url' 
-                          ? 'bg-green-600 hover:bg-green-700' 
-                          : 'bg-blue-600 hover:bg-blue-700'
-                      }`}
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Télécharger</span>
+                    <button onClick={downloadQR} className="bg-green-600 text-white px-4 py-2 rounded-lg">
+                      Télécharger
                     </button>
                   </div>
-
-                  {qrFormat === 'url' && (
-                    <button
-                      onClick={testQrUrl}
-                      className="w-full flex items-center justify-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 mb-4"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      <span>Tester l'URL</span>
-                    </button>
-                  )}
-
-                  <div className={`rounded-lg p-4 ${
-                    qrFormat === 'url' ? 'bg-green-50' : 'bg-blue-50'
-                  }`}>
-                    <p className={`text-sm ${qrFormat === 'url' ? 'text-green-800' : 'text-blue-800'}`}>
-                      <strong>💡 {qrFormat === 'url' ? 'Usage recommandé' : 'Usage avancé'} :</strong><br />
-                      {qrFormat === 'url' 
-                        ? 'Affichez ce QR code dans votre établissement. Les clients le scannent avec leur téléphone et sont redirigés directement vers vos files d\'attente !'
-                        : 'Ce code est optimisé pour l\'app SkipLine. Les clients doivent utiliser le scanner intégré dans l\'app SkipLine.'
-                      }
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Génération du QR code...</p>
                 </div>
               )}
             </div>
