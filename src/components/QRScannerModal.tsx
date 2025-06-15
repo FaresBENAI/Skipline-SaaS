@@ -11,11 +11,13 @@ interface QRScannerModalProps {
 const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState<string>('')
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment')
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -55,6 +57,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
         videoRef.current.srcObject = mediaStream
         await videoRef.current.play()
         setIsScanning(true)
+        startQRDetection()
       }
       
     } catch (err: any) {
@@ -63,7 +66,92 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
     }
   }
 
+  const startQRDetection = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+    }
+
+    scanIntervalRef.current = setInterval(() => {
+      scanForQRCode()
+    }, 500) // Scan toutes les 500ms
+  }
+
+  const scanForQRCode = () => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    
+    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      return
+    }
+
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    // Ajuster la taille du canvas à la vidéo
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    // Dessiner la frame vidéo sur le canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    try {
+      // Utiliser l'API BarcodeDetector si disponible
+      if ('BarcodeDetector' in window) {
+        const barcodeDetector = new (window as any).BarcodeDetector({
+          formats: ['qr_code']
+        })
+
+        barcodeDetector.detect(canvas)
+          .then((barcodes: any[]) => {
+            if (barcodes.length > 0) {
+              const qrData = barcodes[0].rawValue
+              console.log('🔍 QR détecté:', qrData)
+              handleScanResult(qrData)
+            }
+          })
+          .catch((error: any) => {
+            console.log('Erreur détection:', error)
+          })
+      } else {
+        // Fallback : analyser manuellement l'image
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        analyzeImageData(imageData)
+      }
+    } catch (error) {
+      console.log('Erreur scan QR:', error)
+    }
+  }
+
+  const analyzeImageData = (imageData: ImageData) => {
+    // Fallback simple : chercher des patterns QR
+    const data = imageData.data
+    let darkPixels = 0
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      const brightness = (r + g + b) / 3
+      
+      if (brightness < 128) {
+        darkPixels++
+      }
+    }
+    
+    // Si beaucoup de pixels sombres, il pourrait y avoir un QR
+    const ratio = darkPixels / (data.length / 4)
+    
+    if (ratio > 0.1 && ratio < 0.7) {
+      console.log('Pattern QR possible détecté, ratio:', ratio)
+    }
+  }
+
   const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+    
     if (stream) {
       stream.getTracks().forEach(track => track.stop())
       setStream(null)
@@ -76,14 +164,16 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   }
 
   const handleManualInput = () => {
-    const qrContent = prompt('Entrez le contenu du QR Code :')
+    const qrContent = prompt('Entrez le contenu du QR Code (ex: SKIPLINE_USER_123):')
     if (qrContent) {
+      console.log('🔍 QR saisi manuellement:', qrContent)
       handleScanResult(qrContent)
     }
   }
 
   const handleScanResult = (data: string) => {
-    console.log('QR Code scanné:', data)
+    console.log('🎯 QR Code traité:', data)
+    console.log('👤 Type utilisateur:', userType)
     
     try {
       stopCamera()
@@ -93,24 +183,29 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
         // Client scanne QR entreprise
         if (data.startsWith('http') && data.includes('/join/')) {
           const path = data.replace(/^.*?(\/join\/.*)$/, '$1')
+          console.log('🏢 Navigation vers:', path)
           navigate(path)
         } else if (data.includes('/join/')) {
+          console.log('🏢 Navigation vers:', data)
           navigate(data)
         } else {
-          alert('QR Code non reconnu pour client')
+          alert('❌ QR Code entreprise non reconnu')
         }
       } else {
-        // Entreprise scanne QR client
+        // Entreprise scanne QR client - ROUTE CORRIGÉE
         if (data.startsWith('SKIPLINE_USER_')) {
           const userId = data.replace('SKIPLINE_USER_', '')
-          navigate(`/client/${userId}`)
+          const profilePath = `/client/${userId}` // ✅ Route correcte selon App.tsx
+          console.log('👤 Navigation vers profil client:', profilePath)
+          navigate(profilePath)
         } else {
-          alert('QR Code client non reconnu')
+          alert('❌ QR Code client non reconnu. Format attendu: SKIPLINE_USER_XXX')
+          console.log('❌ Données reçues:', data)
         }
       }
       
     } catch (err) {
-      console.error('Erreur traitement QR:', err)
+      console.error('💥 Erreur traitement QR:', err)
       setError('Erreur lors du traitement du QR code')
     }
   }
@@ -120,6 +215,9 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl w-full max-w-md mx-4 overflow-hidden">
+        {/* Canvas caché pour la détection */}
+        <canvas ref={canvasRef} className="hidden" />
+        
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h3 className="text-lg font-bold text-gray-900">
@@ -151,6 +249,13 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
                 <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
                 <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
                 <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+                
+                {/* Ligne de scan animée */}
+                {isScanning && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-40 h-0.5 bg-blue-500 animate-pulse"></div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -191,7 +296,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             <p className="text-sm text-gray-600 mb-3">
               {userType === 'client' 
                 ? 'Scannez le QR code de l\'entreprise' 
-                : 'Scannez le QR code du client'
+                : 'Scannez le QR code du client (SKIPLINE_USER_XXX)'
               }
             </p>
           </div>
@@ -217,6 +322,10 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             <p className="text-xs text-gray-500">
               Caméra {facingMode === 'environment' ? 'arrière' : 'frontale'} active
             </p>
+            {isScanning && (
+              <p className="text-xs text-green-600 mt-1">🔍 Scan en cours...</p>
+            </p>
+            )}
           </div>
         </div>
       </div>
