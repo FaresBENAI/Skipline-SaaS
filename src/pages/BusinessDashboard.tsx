@@ -7,14 +7,15 @@ import {
   QrCode, 
   Plus, 
   Clock,
-  LogOut,
   CheckCircle,
-  Eye,
   Download,
   Copy,
+  Eye,
   ExternalLink
 } from 'lucide-react'
 import QRCodeLib from 'qrcode'
+import UserMenu from '../components/UserMenu'
+import QRScannerModal from '../components/QRScannerModal'
 
 interface Company {
   id: string
@@ -34,7 +35,7 @@ interface Queue {
 }
 
 const BusinessDashboard = () => {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [company, setCompany] = useState<Company | null>(null)
   const [queues, setQueues] = useState<Queue[]>([])
@@ -42,13 +43,19 @@ const BusinessDashboard = () => {
   const [showCreateQueue, setShowCreateQueue] = useState(false)
   const [companyQrUrl, setCompanyQrUrl] = useState<string>('')
   const [showQrModal, setShowQrModal] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
   const [queueForm, setQueueForm] = useState({ name: '' })
-  const baseUrl = window.location.origin
 
   useEffect(() => {
     if (user) {
       fetchCompany()
     }
+
+    // Écouter l'événement pour ouvrir le scanner
+    const handleOpenScanner = () => setShowScanner(true)
+    window.addEventListener('openScanner', handleOpenScanner)
+    
+    return () => window.removeEventListener('openScanner', handleOpenScanner)
   }, [user])
 
   useEffect(() => {
@@ -133,9 +140,8 @@ const BusinessDashboard = () => {
     if (!qrCode) return
 
     try {
-      // UN SEUL QR CODE : URL directe vers page d'inscription
       const companyCode = qrCode.replace('COMPANY_', '').split('_')[0]
-      const qrContent = `${baseUrl}/join/${companyCode}`
+      const qrContent = `${window.location.origin}/join/${companyCode}`
 
       const qrUrl = await QRCodeLib.toDataURL(qrContent, {
         width: 400,
@@ -183,7 +189,7 @@ const BusinessDashboard = () => {
     if (!company?.company_qr_code) return
     
     const companyCode = company.company_qr_code.replace('COMPANY_', '').split('_')[0]
-    const url = `${baseUrl}/join/${companyCode}`
+    const url = `${window.location.origin}/join/${companyCode}`
     
     navigator.clipboard.writeText(url)
     alert('URL copiée dans le presse-papiers !')
@@ -201,7 +207,7 @@ const BusinessDashboard = () => {
   const testQrUrl = () => {
     if (company?.company_qr_code) {
       const companyCode = company.company_qr_code.replace('COMPANY_', '').split('_')[0]
-      const testUrl = `${baseUrl}/join/${companyCode}`
+      const testUrl = `${window.location.origin}/join/${companyCode}`
       window.open(testUrl, '_blank')
     }
   }
@@ -222,8 +228,8 @@ const BusinessDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600">Erreur: Entreprise non trouvée</p>
-          <button onClick={signOut} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">
-            Déconnexion
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">
+            Recharger
           </button>
         </div>
       </div>
@@ -232,6 +238,7 @@ const BusinessDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header avec menu */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -242,27 +249,15 @@ const BusinessDashboard = () => {
                 <p className="text-sm text-gray-600">Dashboard de gestion</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowQrModal(true)}
-                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-              >
-                <QrCode className="w-4 h-4" />
-                <span>QR Inscription</span>
-              </button>
-              <button
-                onClick={signOut}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Déconnexion</span>
-              </button>
-            </div>
+            
+            {/* Menu utilisateur */}
+            <UserMenu userType="business" />
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Section QR Code + Scanner */}
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-6 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -272,15 +267,21 @@ const BusinessDashboard = () => {
                 <p className="text-green-700 text-sm">{company.name} • Files: {queues.length}</p>
               </div>
             </div>
-            <div className="text-center">
+            <div className="flex space-x-3">
               <button
                 onClick={() => setShowQrModal(true)}
                 className="bg-white border-2 border-green-200 text-green-700 px-4 py-2 rounded-lg hover:bg-green-50 flex items-center space-x-2"
               >
                 <Eye className="w-4 h-4" />
-                <span>Voir QR</span>
+                <span>QR Entreprise</span>
               </button>
-              <p className="text-xs text-green-600 mt-1">Pour inscription clients</p>
+              <button
+                onClick={() => setShowScanner(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Scanner Client</span>
+              </button>
             </div>
           </div>
         </div>
@@ -350,7 +351,7 @@ const BusinessDashboard = () => {
         </div>
       </div>
 
-      {/* Modal QR Code SIMPLIFIÉ - UN SEUL QR */}
+      {/* Modal QR Code */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4">
@@ -381,88 +382,176 @@ const BusinessDashboard = () => {
                   <div className="bg-gray-50 rounded-lg p-3 mb-4">
                     <p className="text-xs text-gray-600 mb-1">URL de destination :</p>
                     <p className="text-xs font-mono text-gray-800 break-all">
-                      {baseUrl}/join/{company.company_qr_code?.replace('COMPANY_', '').split('_')[0]}
+                      {window.location.origin}/join/{company.company_qr_code?.replace('COMPANY_', '').split('_')[0]}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     <button
                       onClick={copyQrUrl}
-                      className="flex items-center justify-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                    >
-                      <Copy className="w-4 h-4" />
-                      <span>Copier</span>
-                    </button>
-                    <button
-                      onClick={downloadQR}
-                      className="flex items-center justify-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Télécharger</span>
-                    </button>
-                    <button
-                      onClick={testQrUrl}
-                      className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      <span>Tester</span>
-                    </button>
-                  </div>
+                      cat > src/pages/SettingsPage.tsx << 'EOF'
+import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Bell, Shield, Smartphone, Globe } from 'lucide-react'
 
-                  <div className="rounded-lg p-4 bg-green-50">
-                    <p className="text-sm text-green-800">
-                      <strong>💡 Comment utiliser :</strong><br />
-                      Affichez ce QR code dans votre établissement. Les clients le scannent 
-                      avec leur téléphone et sont dirigés vers la page d'inscription à vos files d'attente !
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Génération du QR code...</p>
-                </div>
-              )}
+const SettingsPage = () => {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [notifications, setNotifications] = useState({
+    email: true,
+    push: false,
+    sms: false
+  })
+
+  const userType = user?.user_metadata?.user_type
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate(userType === 'business' ? '/business' : '/dashboard')}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Paramètres</h1>
+                <p className="text-sm text-gray-600">Configuration de votre compte</p>
+              </div>
             </div>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* Modal création file */}
-      {showCreateQueue && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Nouvelle file d'attente</h3>
-            <form onSubmit={createQueue} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la file *</label>
-                <input
-                  type="text"
-                  value={queueForm.name}
-                  onChange={(e) => setQueueForm({ name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Service principal"
-                  required
-                />
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
+          {/* Notifications */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <Bell className="w-6 h-6 text-blue-600" />
+              <h2 className="text-lg font-bold text-gray-900">Notifications</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900">Notifications par email</h3>
+                  <p className="text-sm text-gray-600">Recevoir les alertes par email</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.email}
+                    onChange={(e) => setNotifications({...notifications, email: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
               </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateQueue(false)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                  Créer
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900">Notifications push</h3>
+                  <p className="text-sm text-gray-600">Notifications sur votre appareil</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.push}
+                    onChange={(e) => setNotifications({...notifications, push: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900">SMS</h3>
+                  <p className="text-sm text-gray-600">Alerts par SMS (bientôt disponible)</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer opacity-50">
+                  <input
+                    type="checkbox"
+                    checked={notifications.sms}
+                    disabled
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Sécurité */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <Shield className="w-6 h-6 text-green-600" />
+              <h2 className="text-lg font-bold text-gray-900">Sécurité</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <button className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                <h3 className="font-medium text-gray-900 mb-1">Changer le mot de passe</h3>
+                <p className="text-sm text-gray-600">Mettre à jour votre mot de passe</p>
+              </button>
+
+              <button className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                <h3 className="font-medium text-gray-900 mb-1">Authentification à deux facteurs</h3>
+                <p className="text-sm text-gray-600">Sécuriser votre compte (bientôt disponible)</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Préférences */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <Globe className="w-6 h-6 text-purple-600" />
+              <h2 className="text-lg font-bold text-gray-900">Préférences</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900">Langue</h3>
+                  <p className="text-sm text-gray-600">Français</p>
+                </div>
+                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  Modifier
                 </button>
               </div>
-            </form>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900">Fuseau horaire</h3>
+                  <p className="text-sm text-gray-600">Europe/Paris</p>
+                </div>
+                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  Modifier
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions dangereuses */}
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <h2 className="text-lg font-bold text-red-900 mb-4">Zone de danger</h2>
+            <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+              Supprimer mon compte
+            </button>
+            <p className="text-sm text-red-700 mt-2">
+              Cette action est irréversible. Toutes vos données seront supprimées.
+            </p>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-export default BusinessDashboard
+export default SettingsPage
+EOF

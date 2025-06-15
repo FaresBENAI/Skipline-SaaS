@@ -6,6 +6,8 @@ import ClientDashboard from './pages/ClientDashboard'
 import BusinessDashboard from './pages/BusinessDashboard'
 import QueueManagement from './pages/QueueManagement'
 import ClientProfile from './pages/ClientProfile'
+import ProfilePage from './pages/ProfilePage'
+import SettingsPage from './pages/SettingsPage'
 import JoinQueue from './pages/JoinQueue'
 import ProtectedRoute from './components/ProtectedRoute'
 import './index.css'
@@ -28,6 +30,8 @@ const AppRoutes = () => {
         path="/auth"
         element={user ? <Navigate to={getDashboardRoute()} replace /> : <AuthPage />}
       />
+      
+      {/* Routes Client */}
       <Route
         path="/dashboard"
         element={
@@ -36,6 +40,37 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute userType="client">
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute userType="client">
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute userType="client">
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-gray-900 mb-4">Notifications</h1>
+                <p className="text-gray-600">Page à venir...</p>
+              </div>
+            </div>
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Routes Business */}
       <Route
         path="/business"
         element={
@@ -52,7 +87,37 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      {/* NOUVELLE ROUTE : Profil client pour les entreprises */}
+      <Route
+        path="/business/profile"
+        element={
+          <ProtectedRoute userType="business">
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/business/settings"
+        element={
+          <ProtectedRoute userType="business">
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/business/notifications"
+        element={
+          <ProtectedRoute userType="business">
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-gray-900 mb-4">Notifications</h1>
+                <p className="text-gray-600">Page à venir...</p>
+              </div>
+            </div>
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Route scan client par entreprise */}
       <Route
         path="/client/:userId"
         element={
@@ -61,6 +126,8 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      
+      {/* Route publique d'inscription */}
       <Route
         path="/join/:companyCode"
         element={<JoinQueue />}
