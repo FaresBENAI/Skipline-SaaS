@@ -5,7 +5,7 @@ import AuthPage from './pages/AuthPage'
 import ClientDashboard from './pages/ClientDashboard'
 import BusinessDashboard from './pages/BusinessDashboard'
 import QueueManagement from './pages/QueueManagement'
-import QRScanner from './pages/QRScanner'
+import ClientProfile from './pages/ClientProfile'
 import JoinQueue from './pages/JoinQueue'
 import ProtectedRoute from './components/ProtectedRoute'
 import './index.css'
@@ -44,7 +44,6 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      {/* NOUVELLE ROUTE pour gestion de file individuelle */}
       <Route
         path="/business/queue/:queueId"
         element={
@@ -53,11 +52,12 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      {/* NOUVELLE ROUTE : Profil client pour les entreprises */}
       <Route
-        path="/scanner"
+        path="/client/:userId"
         element={
-          <ProtectedRoute userType="client">
-            <QRScanner />
+          <ProtectedRoute userType="business">
+            <ClientProfile />
           </ProtectedRoute>
         }
       />
