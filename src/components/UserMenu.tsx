@@ -71,7 +71,7 @@ const UserMenu = ({ userType }: UserMenuProps) => {
     
     try {
       console.log('📸 Début upload photo:', file.name)
-      const avatarUrl = await uploadAvatar(file, user.id)
+      await uploadAvatar(file, user.id)
       
       // Forcer le rechargement pour voir la nouvelle photo
       window.location.reload()
