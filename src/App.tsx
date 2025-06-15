@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import ClientDashboard from './pages/ClientDashboard'
 import BusinessDashboard from './pages/BusinessDashboard'
+import QueueManagement from './pages/QueueManagement'
 import QRScanner from './pages/QRScanner'
 import JoinQueue from './pages/JoinQueue'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -14,20 +15,18 @@ const AppRoutes = () => {
   
   const getDashboardRoute = () => {
     if (!user) return '/auth'
-    
     const userType = user.user_metadata?.user_type
     if (userType === 'business') return '/business'
     if (userType === 'client') return '/dashboard'
-    
     return '/auth'
   }
 
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route 
-        path="/auth" 
-        element={user ? <Navigate to={getDashboardRoute()} replace /> : <AuthPage />} 
+      <Route
+        path="/auth"
+        element={user ? <Navigate to={getDashboardRoute()} replace /> : <AuthPage />}
       />
       <Route
         path="/dashboard"
@@ -42,6 +41,15 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute userType="business">
             <BusinessDashboard />
+          </ProtectedRoute>
+        }
+      />
+      {/* NOUVELLE ROUTE pour gestion de file individuelle */}
+      <Route
+        path="/business/queue/:queueId"
+        element={
+          <ProtectedRoute userType="business">
+            <QueueManagement />
           </ProtectedRoute>
         }
       />
