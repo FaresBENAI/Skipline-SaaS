@@ -174,6 +174,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
       onClose()
 
       if (userType === 'client') {
+        // Client scanne QR entreprise
         if (data.startsWith('http') && data.includes('/join/')) {
           const path = data.replace(/^.*?(\/join\/.*)$/, '$1')
           console.log('🏢 Navigation vers:', path)
@@ -185,13 +186,25 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
           alert('❌ QR Code entreprise non reconnu')
         }
       } else {
+        // Entreprise scanne QR client - NOUVEAUX FORMATS
         if (data.startsWith('SKIPLINE_USER_')) {
           const userId = data.replace('SKIPLINE_USER_', '')
           const profilePath = `/client/${userId}`
           console.log('👤 Navigation vers profil client:', profilePath)
           navigate(profilePath)
+        } else if (data.startsWith('QR_')) {
+          // Format de la base : QR_xxxxx_timestamp
+          const parts = data.split('_')
+          if (parts.length >= 2) {
+            const userId = parts[1] // Récupérer l'ID après QR_
+            const profilePath = `/client/${userId}`
+            console.log('👤 Navigation vers profil client (format DB):', profilePath)
+            navigate(profilePath)
+          } else {
+            alert('❌ Format QR invalide')
+          }
         } else {
-          alert('❌ QR Code client non reconnu. Format attendu: SKIPLINE_USER_XXX')
+          alert('❌ QR Code client non reconnu. Format attendu: SKIPLINE_USER_XXX ou QR_XXX')
           console.log('❌ Données reçues:', data)
         }
       }
@@ -234,7 +247,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-48 h-48">
                 <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
-                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tl-lg"></div>
                 <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
                 <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
                 
@@ -282,7 +295,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             <p className="text-sm text-gray-600 mb-3">
               {userType === 'client' 
                 ? 'Scannez le QR code de l\'entreprise' 
-                : 'Scannez le QR code du client (SKIPLINE_USER_XXX)'
+                : 'Scannez le QR code du client'
               }
             </p>
           </div>
@@ -309,7 +322,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
               Caméra {facingMode === 'environment' ? 'arrière' : 'frontale'} active
             </p>
             {isScanning && (
-              <p className="text-xs text-green-600 mt-1">🔍 Scan en cours...</p>
+              <p className="text-xs text-green-600 mt-1">�� Scan en cours...</p>
             )}
           </div>
         </div>
