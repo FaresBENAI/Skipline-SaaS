@@ -133,6 +133,7 @@ const BusinessDashboard = () => {
         return
       }
 
+      console.log('📋 Files récupérées:', data)
       setQueues(data || [])
     } catch (error) {
       console.error('Erreur fetchQueues:', error)
@@ -197,10 +198,22 @@ const BusinessDashboard = () => {
     }
   }
 
-  // Navigation vers la gestion de file
+  // Navigation vers la gestion de file AVEC DEBUGGING
   const handleQueueClick = (queue: Queue) => {
-    console.log('🎯 Navigation vers gestion file:', queue.id)
-    navigate(`/business/queue/${queue.id}`)
+    console.log('🔥 CLIC SUR FILE DÉTECTÉ')
+    console.log('Queue cliquée:', queue)
+    console.log('Queue ID:', queue.id)
+    console.log('Navigate function:', navigate)
+    
+    const targetPath = `/business/queue/${queue.id}`
+    console.log('🎯 Navigation vers:', targetPath)
+    
+    try {
+      navigate(targetPath)
+      console.log('✅ Navigation lancée avec succès')
+    } catch (error) {
+      console.error('❌ Erreur navigation:', error)
+    }
   }
 
   const copyQrContent = () => {
@@ -322,11 +335,11 @@ const BusinessDashboard = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Files d'attente */}
+          {/* Files d'attente avec DEBUGGING */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-gray-900">Files d'attente</h2>
+                <h2 className="text-lg font-bold text-gray-900">Files d'attente ({queues.length})</h2>
                 <button
                   onClick={() => setShowCreateQueue(true)}
                   className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -339,11 +352,16 @@ const BusinessDashboard = () => {
                 {queues.map((queue) => (
                   <div
                     key={queue.id}
-                    onClick={() => handleQueueClick(queue)}
+                    onClick={() => {
+                      console.log('🔥 DIV CLICKÉE - Queue:', queue.name, 'ID:', queue.id)
+                      handleQueueClick(queue)
+                    }}
                     className="p-4 rounded-lg border-2 cursor-pointer transition-colors border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.05)' }}
                   >
                     <h3 className="font-semibold text-gray-900">{queue.name}</h3>
                     <p className="text-sm text-gray-600 mt-1">🟢 Active • Cliquez pour gérer</p>
+                    <p className="text-xs text-blue-600 mt-1">ID: {queue.id}</p>
                   </div>
                 ))}
 
@@ -388,7 +406,7 @@ const BusinessDashboard = () => {
         </div>
       </div>
 
-      {/* Modal QR Code Entreprise */}
+      {/* Tous les modals restent identiques... */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -402,7 +420,6 @@ const BusinessDashboard = () => {
               </button>
             </div>
             
-            {/* Sélecteur de format */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Format du QR Code :
@@ -416,7 +433,7 @@ const BusinessDashboard = () => {
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold">📱 URL Directe</div>
+                  <div className="font-semibold">�� URL Directe</div>
                   <div className="text-xs text-gray-600">Pour scan téléphone</div>
                 </button>
                 <button
