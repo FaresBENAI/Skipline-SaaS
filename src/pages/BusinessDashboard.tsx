@@ -1,25 +1,14 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { 
-  Building2, 
-  QrCode, 
-  Plus, 
-  Clock,
-  LogOut,
-  CheckCircle,
-  Download,
-  Copy,
-  Eye,
-  ExternalLink
-} from 'lucide-react'
+import { Building2, QrCode, Plus, Clock, LogOut, CheckCircle, Eye } from 'lucide-react'
 import QRCodeLib from 'qrcode'
 
 interface Company {
   id: string
   name: string
-  description: string | null  
+  description: string | null
   owner_id: string
   is_active: boolean
   company_qr_code: string | null
@@ -42,8 +31,6 @@ const BusinessDashboard = () => {
   const [showCreateQueue, setShowCreateQueue] = useState(false)
   const [companyQrUrl, setCompanyQrUrl] = useState<string>('')
   const [showQrModal, setShowQrModal] = useState(false)
-  const [qrFormat, setQrFormat] = useState<'url' | 'code'>('url')
-  
   const [queueForm, setQueueForm] = useState({ name: '' })
   const baseUrl = window.location.origin
 
@@ -62,7 +49,7 @@ const BusinessDashboard = () => {
         generateMissingQR()
       }
     }
-  }, [company, qrFormat])
+  }, [company])
 
   const fetchCompany = async () => {
     try {
@@ -78,7 +65,6 @@ const BusinessDashboard = () => {
 
       const companyData = data && data.length > 0 ? data[0] : null
       setCompany(companyData)
-      
     } catch (error) {
       console.error('Erreur fetchCompany:', error)
     } finally {
@@ -99,7 +85,7 @@ const BusinessDashboard = () => {
         .select()
 
       if (error) {
-        console.error('❌ Erreur génération QR:', error)
+        console.error('Erreur génération QR:', error)
         return
       }
 
@@ -108,7 +94,7 @@ const BusinessDashboard = () => {
         generateCompanyQR(qrCode)
       }
     } catch (error) {
-      console.error('💥 Erreur generateMissingQR:', error)
+      console.error('Erreur generateMissingQR:', error)
     }
   }
 
@@ -136,20 +122,14 @@ const BusinessDashboard = () => {
     if (!qrCode) return
 
     try {
-      let qrContent = ''
-      
-      if (qrFormat === 'url') {
-        const companyCode = qrCode.replace('COMPANY_', '').split('_')[0]
-        qrContent = `${baseUrl}/join/${companyCode}`
-      } else {
-        qrContent = `SKIPLINE_${qrCode}`
-      }
+      const companyCode = qrCode.replace('COMPANY_', '').split('_')[0]
+      const qrContent = `${baseUrl}/join/${companyCode}`
 
       const qrUrl = await QRCodeLib.toDataURL(qrContent, {
         width: 400,
         margin: 2,
         color: {
-          dark: qrFormat === 'url' ? '#059669' : '#1e40af',
+          dark: '#059669',
           light: '#ffffff'
         }
       })
@@ -167,12 +147,7 @@ const BusinessDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('queues')
-        .insert([
-          {
-            name: queueForm.name,
-            company_id: company.id
-          }
-        ])
+        .insert([{ name: queueForm.name, company_id: company.id }])
         .select()
 
       if (error) throw error
@@ -188,51 +163,9 @@ const BusinessDashboard = () => {
     }
   }
 
-  // TEST SIMPLE avec alert
   const handleQueueClick = (queue: Queue) => {
-    // TEST 1: Vérifier si le clic fonctionne
-    alert(`Clic détecté sur: ${queue.name} (ID: ${queue.id})`)
-    
-    // TEST 2: Tenter la navigation
-    try {
-      const targetPath = `/business/queue/${queue.id}`
-      navigate(targetPath)
-      alert(`Navigation lancée vers: ${targetPath}`)
-    } catch (error) {
-      alert(`Erreur navigation: ${error}`)
-    }
-  }
-
-  const copyQrContent = () => {
-    if (!company?.company_qr_code) return
-
-    let content = ''
-    if (qrFormat === 'url') {
-      const companyCode = company.company_qr_code.replace('COMPANY_', '').split('_')[0]
-      content = `${baseUrl}/join/${companyCode}`
-    } else {
-      content = `SKIPLINE_${company.company_qr_code}`
-    }
-
-    navigator.clipboard.writeText(content)
-    alert(`${qrFormat === 'url' ? 'URL' : 'Code'} copié dans le presse-papiers !`)
-  }
-
-  const downloadQR = () => {
-    if (companyQrUrl && company) {
-      const link = document.createElement('a')
-      link.download = `qr-${company.name}-${qrFormat}.png`
-      link.href = companyQrUrl
-      link.click()
-    }
-  }
-
-  const testQrUrl = () => {
-    if (company?.company_qr_code) {
-      const companyCode = company.company_qr_code.replace('COMPANY_', '').split('_')[0]
-      const testUrl = `${baseUrl}/join/${companyCode}`
-      window.open(testUrl, '_blank')
-    }
+    alert(`TEST: Clic sur ${queue.name}`)
+    navigate(`/business/queue/${queue.id}`)
   }
 
   if (loading) {
@@ -251,10 +184,7 @@ const BusinessDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600">Erreur: Entreprise non trouvée</p>
-          <button
-            onClick={signOut}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg"
-          >
+          <button onClick={signOut} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">
             Déconnexion
           </button>
         </div>
@@ -301,9 +231,7 @@ const BusinessDashboard = () => {
               <CheckCircle className="w-6 h-6 text-green-600 mr-3" />
               <div>
                 <h3 className="text-green-800 font-semibold">Entreprise créée avec succès !</h3>
-                <p className="text-green-700 text-sm">
-                  {company.name} • QR Code: {company.company_qr_code ? '✅ Généré' : '🔄 Génération...'}
-                </p>
+                <p className="text-green-700 text-sm">{company.name} • Files: {queues.length}</p>
               </div>
             </div>
             <div className="text-center">
@@ -314,7 +242,6 @@ const BusinessDashboard = () => {
                 <Eye className="w-4 h-4" />
                 <span>Voir QR</span>
               </button>
-              <p className="text-xs text-green-600 mt-1">Pour vos clients</p>
             </div>
           </div>
         </div>
@@ -341,7 +268,6 @@ const BusinessDashboard = () => {
                   >
                     <h3 className="font-semibold text-gray-900">{queue.name}</h3>
                     <p className="text-sm text-gray-600 mt-1">🟢 Active • Cliquez pour gérer</p>
-                    <p className="text-xs text-blue-600 mt-1">TEST - ID: {queue.id.substring(0, 8)}...</p>
                   </button>
                 ))}
 
@@ -365,95 +291,37 @@ const BusinessDashboard = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12">
               <div className="text-center">
                 <QrCode className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Mode Test - Cliquez sur une file
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Une alerte devrait s'afficher quand vous cliquez sur une file
-                </p>
-                {queues.length === 0 && (
-                  <button
-                    onClick={() => setShowCreateQueue(true)}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-                  >
-                    Créer une file
-                  </button>
-                )}
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Mode Test</h3>
+                <p className="text-gray-600 mb-6">Cliquez sur une file pour tester</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Modal QR Code simplifié */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-900">QR Code SkipLine</h3>
-              <button
-                onClick={() => setShowQrModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
+              <button onClick={() => setShowQrModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">
                 ✕
               </button>
             </div>
-            
-            <div className="mb-6">
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setQrFormat('url')}
-                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                    qrFormat === 'url' 
-                      ? 'border-green-500 bg-green-50 text-green-800' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-semibold">📱 URL Directe</div>
-                </button>
-                <button
-                  onClick={() => setQrFormat('code')}
-                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                    qrFormat === 'code' 
-                      ? 'border-blue-500 bg-blue-50 text-blue-800' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-semibold">🔧 Code SkipLine</div>
-                </button>
-              </div>
-            </div>
-
             <div className="text-center">
-              {companyQrUrl && (
-                <div>
-                  <img src={companyQrUrl} alt="QR Code" className="w-64 mx-auto mb-4" />
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={copyQrContent} className="bg-gray-600 text-white px-4 py-2 rounded-lg">
-                      Copier
-                    </button>
-                    <button onClick={downloadQR} className="bg-green-600 text-white px-4 py-2 rounded-lg">
-                      Télécharger
-                    </button>
-                  </div>
-                </div>
-              )}
+              {companyQrUrl && <img src={companyQrUrl} alt="QR Code" className="w-64 mx-auto" />}
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal création file */}
       {showCreateQueue && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Nouvelle file d'attente</h3>
-            
             <form onSubmit={createQueue} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom de la file *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la file *</label>
                 <input
                   type="text"
                   value={queueForm.name}
@@ -463,7 +331,6 @@ const BusinessDashboard = () => {
                   required
                 />
               </div>
-
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -472,10 +339,7 @@ const BusinessDashboard = () => {
                 >
                   Annuler
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                   Créer
                 </button>
               </div>
