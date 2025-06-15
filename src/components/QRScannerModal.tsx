@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
 import { X, QrCode, RotateCw } from 'lucide-react'
 
 interface QRScannerModalProps {
