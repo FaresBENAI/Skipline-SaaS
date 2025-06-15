@@ -2,7 +2,18 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Building2, QrCode, Plus, Clock, LogOut, CheckCircle, Eye } from 'lucide-react'
+import { 
+  Building2, 
+  QrCode, 
+  Plus, 
+  Clock,
+  LogOut,
+  CheckCircle,
+  Eye,
+  Download,
+  Copy,
+  ExternalLink
+} from 'lucide-react'
 import QRCodeLib from 'qrcode'
 
 interface Company {
@@ -122,6 +133,7 @@ const BusinessDashboard = () => {
     if (!qrCode) return
 
     try {
+      // UN SEUL QR CODE : URL directe vers page d'inscription
       const companyCode = qrCode.replace('COMPANY_', '').split('_')[0]
       const qrContent = `${baseUrl}/join/${companyCode}`
 
@@ -164,8 +176,34 @@ const BusinessDashboard = () => {
   }
 
   const handleQueueClick = (queue: Queue) => {
-    alert(`TEST: Clic sur ${queue.name}`)
     navigate(`/business/queue/${queue.id}`)
+  }
+
+  const copyQrUrl = () => {
+    if (!company?.company_qr_code) return
+    
+    const companyCode = company.company_qr_code.replace('COMPANY_', '').split('_')[0]
+    const url = `${baseUrl}/join/${companyCode}`
+    
+    navigator.clipboard.writeText(url)
+    alert('URL copiée dans le presse-papiers !')
+  }
+
+  const downloadQR = () => {
+    if (companyQrUrl && company) {
+      const link = document.createElement('a')
+      link.download = `qr-${company.name}-inscription.png`
+      link.href = companyQrUrl
+      link.click()
+    }
+  }
+
+  const testQrUrl = () => {
+    if (company?.company_qr_code) {
+      const companyCode = company.company_qr_code.replace('COMPANY_', '').split('_')[0]
+      const testUrl = `${baseUrl}/join/${companyCode}`
+      window.open(testUrl, '_blank')
+    }
   }
 
   if (loading) {
@@ -210,7 +248,7 @@ const BusinessDashboard = () => {
                 className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
               >
                 <QrCode className="w-4 h-4" />
-                <span>QR Entreprise</span>
+                <span>QR Inscription</span>
               </button>
               <button
                 onClick={signOut}
@@ -242,6 +280,7 @@ const BusinessDashboard = () => {
                 <Eye className="w-4 h-4" />
                 <span>Voir QR</span>
               </button>
+              <p className="text-xs text-green-600 mt-1">Pour inscription clients</p>
             </div>
           </div>
         </div>
@@ -291,30 +330,105 @@ const BusinessDashboard = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12">
               <div className="text-center">
                 <QrCode className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Mode Test</h3>
-                <p className="text-gray-600 mb-6">Cliquez sur une file pour tester</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Sélectionnez une file pour la gérer
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Cliquez sur une file à gauche pour voir sa gestion détaillée
+                </p>
+                {queues.length === 0 && (
+                  <button
+                    onClick={() => setShowCreateQueue(true)}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                  >
+                    Créer une file
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Modal QR Code SIMPLIFIÉ - UN SEUL QR */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full mx-4">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">QR Code SkipLine</h3>
-              <button onClick={() => setShowQrModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">
+              <h3 className="text-xl font-bold text-gray-900">QR Code d'Inscription</h3>
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
                 ✕
               </button>
             </div>
+            
             <div className="text-center">
-              {companyQrUrl && <img src={companyQrUrl} alt="QR Code" className="w-64 mx-auto" />}
+              {companyQrUrl ? (
+                <div>
+                  <div className="p-6 rounded-xl border-2 border-green-200 bg-green-50 mb-4">
+                    <img
+                      src={companyQrUrl}
+                      alt="QR Code Inscription"
+                      className="w-full max-w-xs mx-auto"
+                    />
+                  </div>
+                  
+                  <h4 className="font-semibold text-gray-900 mb-2">{company.name}</h4>
+                  <p className="text-sm text-gray-600 mb-4">QR Code pour inscription clients</p>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-gray-600 mb-1">URL de destination :</p>
+                    <p className="text-xs font-mono text-gray-800 break-all">
+                      {baseUrl}/join/{company.company_qr_code?.replace('COMPANY_', '').split('_')[0]}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <button
+                      onClick={copyQrUrl}
+                      className="flex items-center justify-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span>Copier</span>
+                    </button>
+                    <button
+                      onClick={downloadQR}
+                      className="flex items-center justify-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Télécharger</span>
+                    </button>
+                    <button
+                      onClick={testQrUrl}
+                      className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Tester</span>
+                    </button>
+                  </div>
+
+                  <div className="rounded-lg p-4 bg-green-50">
+                    <p className="text-sm text-green-800">
+                      <strong>💡 Comment utiliser :</strong><br />
+                      Affichez ce QR code dans votre établissement. Les clients le scannent 
+                      avec leur téléphone et sont dirigés vers la page d'inscription à vos files d'attente !
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Génération du QR code...</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
+      {/* Modal création file */}
       {showCreateQueue && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">

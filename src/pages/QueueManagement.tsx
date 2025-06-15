@@ -23,43 +23,26 @@ interface QueueEntry {
 }
 
 const QueueManagement = () => {
-  // DEBUG: Log du début du composant
-  console.log('🔥 QueueManagement component started')
-  
   const { queueId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  
-  console.log('🎯 Params:', { queueId, user: !!user })
   
   const [queue, setQueue] = useState<Queue | null>(null)
   const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    console.log('🔄 useEffect triggered:', { queueId, user: !!user })
-    
-    if (!queueId) {
-      console.error('❌ Pas de queueId!')
-      alert('Erreur: Pas d\'ID de file')
-      navigate('/business')
-      return
+    if (queueId && user) {
+      fetchQueue()
+      fetchQueueEntries()
+      
+      // Actualisation auto toutes les 10 secondes
+      const interval = setInterval(fetchQueueEntries, 10000)
+      return () => clearInterval(interval)
     }
-    
-    if (!user) {
-      console.error('❌ Pas d\'utilisateur!')
-      alert('Erreur: Utilisateur non connecté')
-      navigate('/business')
-      return
-    }
-    
-    fetchQueue()
-    fetchQueueEntries()
   }, [queueId, user])
 
   const fetchQueue = async () => {
-    console.log('📋 Fetching queue:', queueId)
-    
     try {
       const { data, error } = await supabase
         .from('queues')
@@ -67,34 +50,20 @@ const QueueManagement = () => {
         .eq('id', queueId)
         .single()
 
-      console.log('📋 Queue response:', { data, error })
-
-      if (error) {
-        console.error('❌ Erreur récupération file:', error)
-        alert(`Erreur DB: ${error.message}`)
+      if (error || !data) {
+        console.error('Erreur récupération file:', error)
         navigate('/business')
         return
       }
 
-      if (!data) {
-        console.error('❌ Aucune file trouvée')
-        alert('File non trouvée')
-        navigate('/business')
-        return
-      }
-
-      console.log('✅ File récupérée:', data)
       setQueue(data)
     } catch (error) {
-      console.error('💥 Erreur fetchQueue:', error)
-      alert(`Erreur critique: ${error}`)
+      console.error('Erreur fetchQueue:', error)
       navigate('/business')
     }
   }
 
   const fetchQueueEntries = async () => {
-    console.log('👥 Fetching queue entries for:', queueId)
-    
     try {
       const { data, error } = await supabase
         .from('queue_entries')
@@ -106,21 +75,16 @@ const QueueManagement = () => {
         .in('status', ['waiting', 'called'])
         .order('position', { ascending: true })
 
-      console.log('👥 Entries response:', { data, error })
-
       if (error) {
-        console.error('❌ Erreur récupération entrées:', error)
-        // Ne pas rediriger pour cette erreur, juste afficher vide
+        console.error('Erreur récupération entrées:', error)
         setQueueEntries([])
-        setLoading(false)
-        return
+      } else {
+        setQueueEntries(data || [])
       }
-
-      console.log('✅ Entrées récupérées:', data?.length || 0)
-      setQueueEntries(data || [])
+      
       setLoading(false)
     } catch (error) {
-      console.error('💥 Erreur fetchQueueEntries:', error)
+      console.error('Erreur fetchQueueEntries:', error)
       setQueueEntries([])
       setLoading(false)
     }
@@ -141,10 +105,11 @@ const QueueManagement = () => {
 
       if (error) throw error
 
-      alert(`📢 ${nextEntry.user.full_name || nextEntry.user.email} appelé(e) !`)
+      alert(`📢 ${nextEntry.user?.full_name || nextEntry.user?.email || 'Client'} appelé(e) !`)
       fetchQueueEntries()
     } catch (error) {
       console.error('Erreur appel client:', error)
+      alert('Erreur lors de l\'appel du client')
     }
   }
 
@@ -162,36 +127,28 @@ const QueueManagement = () => {
       fetchQueueEntries()
     } catch (error) {
       console.error('Erreur marquage servi:', error)
+      alert('Erreur lors du marquage')
     }
   }
 
-  console.log('🎨 Render state:', { loading, queue: !!queue, queueId })
-
   if (loading) {
-    console.log('⏳ Rendering loading state')
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Chargement de la file...</p>
-          <p className="text-xs text-gray-500 mt-2">DEBUG: Queue ID = {queueId}</p>
         </div>
       </div>
     )
   }
 
   if (!queue) {
-    console.log('❌ Rendering not found state')
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600">File non trouvée</p>
-          <p className="text-xs text-gray-500 mt-2">DEBUG: Queue ID = {queueId}</p>
           <button
-            onClick={() => {
-              console.log('🔙 Retour au dashboard')
-              navigate('/business')
-            }}
+            onClick={() => navigate('/business')}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg"
           >
             Retour au dashboard
@@ -201,7 +158,6 @@ const QueueManagement = () => {
     )
   }
 
-  console.log('✅ Rendering main component')
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
@@ -209,10 +165,7 @@ const QueueManagement = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => {
-                  console.log('🔙 Navigate back to business')
-                  navigate('/business')
-                }}
+                onClick={() => navigate('/business')}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -225,7 +178,7 @@ const QueueManagement = () => {
             <button
               onClick={callNext}
               disabled={queueEntries.filter(e => e.status === 'waiting').length === 0}
-              className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Bell className="w-5 h-5" />
               <span>Appeler suivant</span>
@@ -235,6 +188,7 @@ const QueueManagement = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 text-center">
             <div className="text-3xl font-bold text-blue-600 mb-2">
@@ -256,13 +210,14 @@ const QueueManagement = () => {
           </div>
         </div>
 
+        {/* Liste des clients */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">
               Clients dans la file ({queueEntries.length})
             </h2>
             <div className="text-sm text-gray-500">
-              🔧 Mode Debug
+              ⏱️ Actualisation automatique
             </div>
           </div>
           
@@ -272,9 +227,6 @@ const QueueManagement = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun client en attente</h3>
               <p className="text-gray-600">
                 Les clients apparaîtront ici quand ils scanneront votre QR code
-              </p>
-              <p className="text-xs text-gray-500 mt-4">
-                DEBUG: Queue ID = {queueId}, Entries loaded = {queueEntries.length}
               </p>
             </div>
           ) : (
