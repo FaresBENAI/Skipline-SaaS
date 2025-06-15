@@ -7,7 +7,6 @@ import {
   ArrowLeft, 
   Plus,
   Clock,
-  CheckCircle,
   Building2
 } from 'lucide-react'
 
@@ -73,7 +72,6 @@ const ClientProfile = () => {
 
   const fetchCompanyAndQueues = async () => {
     try {
-      // Récupérer l'entreprise de l'utilisateur connecté
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .select('*')
@@ -89,7 +87,6 @@ const ClientProfile = () => {
 
       setCompany(companyData)
 
-      // Récupérer les files de cette entreprise
       const { data: queuesData, error: queuesError } = await supabase
         .from('queues')
         .select('*')
@@ -115,8 +112,7 @@ const ClientProfile = () => {
     setAddingToQueue(queueId)
 
     try {
-      // Vérifier si le client est déjà dans cette file
-      const { data: existingEntry, error: checkError } = await supabase
+      const { data: existingEntry } = await supabase
         .from('queue_entries')
         .select('*')
         .eq('queue_id', queueId)
@@ -130,7 +126,6 @@ const ClientProfile = () => {
         return
       }
 
-      // Récupérer la dernière position dans cette file
       const { data: lastPosition, error: positionError } = await supabase
         .from('queue_entries')
         .select('position')
@@ -145,8 +140,7 @@ const ClientProfile = () => {
 
       const newPosition = (lastPosition?.[0]?.position || 0) + 1
 
-      // Ajouter le client à la file
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('queue_entries')
         .insert([
           {
@@ -156,14 +150,12 @@ const ClientProfile = () => {
             status: 'waiting'
           }
         ])
-        .select()
 
       if (error) throw error
 
       const selectedQueue = queues.find(q => q.id === queueId)
       alert(`✅ ${clientProfile.full_name || clientProfile.email} ajouté à la file "${selectedQueue?.name}" en position ${newPosition}`)
       
-      // Rediriger vers la gestion de cette file
       navigate(`/business/queue/${queueId}`)
 
     } catch (error) {
@@ -203,7 +195,6 @@ const ClientProfile = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -224,7 +215,6 @@ const ClientProfile = () => {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Profil Client */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex items-center space-x-6">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
@@ -242,7 +232,6 @@ const ClientProfile = () => {
           </div>
         </div>
 
-        {/* Ajouter à une file */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-900">
