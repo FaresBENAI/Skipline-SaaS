@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Bell, Shield, Smartphone, Globe } from 'lucide-react'
+import { ArrowLeft, Bell, Shield, Globe } from 'lucide-react'
 
 const SettingsPage = () => {
   const { user } = useAuth()

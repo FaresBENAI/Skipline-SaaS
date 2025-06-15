@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { X, Camera, QrCode, RotateCw } from 'lucide-react'
+import { X, QrCode, RotateCw } from 'lucide-react'
 
 interface QRScannerModalProps {
   isOpen: boolean
@@ -11,7 +11,6 @@ interface QRScannerModalProps {
 
 const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const videoRef = useRef<HTMLVideoElement>(null)
   
   const [isScanning, setIsScanning] = useState(false)
