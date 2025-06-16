@@ -1,0 +1,1 @@
+# Code génération QR client
