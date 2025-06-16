@@ -52,11 +52,11 @@ const HomePage = () => {
               <ArrowRight className="h-5 w-5" />
             </button>
             <button
-              onClick={() => navigate('/scanner')}
+              onClick={() => navigate('/auth')}
               className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-50 flex items-center space-x-2"
             >
-              <QrCode className="h-5 w-5" />
-              <span>Scanner QR</span>
+              <Users className="h-5 w-5" />
+              <span>Créer mon compte</span>
             </button>
           </div>
         </div>
@@ -65,8 +65,8 @@ const HomePage = () => {
         <div className="mt-20 grid md:grid-cols-3 gap-8">
           <div className="text-center p-6 bg-white rounded-xl shadow-sm">
             <QrCode className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">QR Code Simple</h3>
-            <p className="text-gray-600">Un QR code par entreprise, scannable par tous vos clients</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Double Workflow</h3>
+            <p className="text-gray-600">Client scanne entreprise OU entreprise scanne client selon vos besoins</p>
           </div>
           <div className="text-center p-6 bg-white rounded-xl shadow-sm">
             <Users className="h-12 w-12 text-green-600 mx-auto mb-4" />
