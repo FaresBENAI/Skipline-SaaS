@@ -1,35 +1,29 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Scan, Users, Zap } from 'lucide-react'
+import { QrCode, Users, Building2, ArrowRight } from 'lucide-react'
 
 const HomePage = () => {
   const navigate = useNavigate()
 
-  // Logo épuré - juste typographie moderne
-  const SkipLineLogo = () => (
-    <div className="flex items-center">
-      <span className="text-2xl font-light tracking-tight text-gray-900">
-        Skip<span className="font-medium">Line</span>
-      </span>
-    </div>
-  )
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header ultra-minimaliste */}
-      <header className="border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <SkipLineLogo />
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2">
+              <QrCode className="h-8 w-8 text-blue-600" />
+              <span className="text-xl font-bold text-gray-900">SkipLine</span>
+            </div>
+            <div className="flex space-x-4">
               <button
                 onClick={() => navigate('/auth')}
-                className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+                className="text-gray-600 hover:text-gray-900"
               >
                 Connexion
               </button>
               <button
                 onClick={() => navigate('/auth')}
-                className="bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
                 Commencer
               </button>
@@ -38,116 +32,54 @@ const HomePage = () => {
         </div>
       </header>
 
-      {/* Hero ultra-épuré */}
-      <main className="max-w-6xl mx-auto px-6">
-        <div className="pt-24 pb-20 text-center">
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light text-gray-900 tracking-tight">
-            Files d'attente
-            <span className="block font-normal text-gray-700 mt-2">
-              réinventées
-            </span>
+      {/* Hero */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900 sm:text-6xl">
+            Révolutionnez vos
+            <span className="text-blue-600"> files d'attente</span>
           </h1>
-          
-          <p className="mt-8 text-xl text-gray-600 max-w-2xl mx-auto font-light leading-relaxed">
-            Système QR intelligent avec double workflow. 
-            Simple, efficace, universel.
+          <p className="mt-6 text-xl text-gray-600 max-w-3xl mx-auto">
+            SkipLine permet à vos clients de rejoindre vos files d'attente en scannant simplement un QR code.
+            Terminé l'attente physique, place à l'expérience digitale !
           </p>
-
-          {/* CTA épuré */}
-          <div className="mt-12 flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="mt-10 flex justify-center space-x-6">
             <button
               onClick={() => navigate('/auth')}
-              className="group bg-gray-900 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-all duration-200 flex items-center space-x-2 font-medium"
+              className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 flex items-center space-x-2"
             >
-              <span>Créer mon compte</span>
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+              <span>Créer mon entreprise</span>
+              <ArrowRight className="h-5 w-5" />
             </button>
-            
             <button
-              onClick={() => navigate('/join/demo')}
-              className="border border-gray-300 text-gray-700 px-8 py-3 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors font-medium"
+              onClick={() => navigate('/scanner')}
+              className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-50 flex items-center space-x-2"
             >
-              Voir la démo
+              <QrCode className="h-5 w-5" />
+              <span>Scanner QR</span>
             </button>
           </div>
         </div>
 
-        {/* Features minimalistes */}
-        <div className="py-20 border-t border-gray-100">
-          <div className="grid md:grid-cols-3 gap-12">
-            
-            {/* Feature 1 */}
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Scan className="h-6 w-6 text-gray-700" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">
-                Double workflow
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Client scanne entreprise ou entreprise scanne client. 
-                Flexibilité totale selon vos besoins.
-              </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="h-6 w-6 text-gray-700" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">
-                Accès universel
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Avec ou sans compte, vos clients rejoignent vos files. 
-                Aucune barrière, expérience fluide.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Zap className="h-6 w-6 text-gray-700" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">
-                Temps réel
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Suivi instantané des positions, notifications automatiques, 
-                dashboard centralisé pour tout contrôler.
-              </p>
-            </div>
-
+        {/* Features */}
+        <div className="mt-20 grid md:grid-cols-3 gap-8">
+          <div className="text-center p-6 bg-white rounded-xl shadow-sm">
+            <QrCode className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">QR Code Simple</h3>
+            <p className="text-gray-600">Un QR code par entreprise, scannable par tous vos clients</p>
+          </div>
+          <div className="text-center p-6 bg-white rounded-xl shadow-sm">
+            <Users className="h-12 w-12 text-green-600 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Accès Universel</h3>
+            <p className="text-gray-600">Clients avec ou sans compte peuvent rejoindre vos files</p>
+          </div>
+          <div className="text-center p-6 bg-white rounded-xl shadow-sm">
+            <Building2 className="h-12 w-12 text-purple-600 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Gestion Centralisée</h3>
+            <p className="text-gray-600">Dashboard entreprise pour gérer toutes vos files en temps réel</p>
           </div>
         </div>
-
-        {/* Section finale épurée */}
-        <div className="py-20 text-center border-t border-gray-100">
-          <h2 className="text-3xl font-light text-gray-900 mb-6">
-            Prêt à transformer vos files d'attente ?
-          </h2>
-          <p className="text-lg text-gray-600 mb-8 max-w-xl mx-auto">
-            Rejoignez les entreprises qui ont choisi l'innovation.
-          </p>
-          <button
-            onClick={() => navigate('/auth')}
-            className="bg-gray-900 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium inline-flex items-center space-x-2"
-          >
-            <span>Commencer maintenant</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-
       </main>
-
-      {/* Footer minimaliste */}
-      <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <p className="text-sm text-gray-500">
-            © 2025 SkipLine. Révolutionnez vos files d'attente.
-          </p>
-        </div>
-      </footer>
     </div>
   )
 }
