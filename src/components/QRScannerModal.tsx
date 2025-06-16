@@ -18,11 +18,19 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment')
   const [debugInfo, setDebugInfo] = useState<string>('')
+  const [qrScanner, setQrScanner] = useState<any>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Détection Safari
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
 
   useEffect(() => {
     if (isOpen) {
-      startCamera()
+      if (isSafari) {
+        startSafariScanner()
+      } else {
+        startCamera()
+      }
     } else {
       stopCamera()
     }
@@ -30,10 +38,49 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
     return () => stopCamera()
   }, [isOpen, facingMode])
 
+  const startSafariScanner = async () => {
+    try {
+      setError('')
+      setDebugInfo('🍎 Mode Safari - Chargement scanner...')
+      
+      // Import dynamique pour Safari
+      const QrScanner = (await import('qr-scanner')).default
+
+      if (videoRef.current) {
+        const scanner = new QrScanner(
+          videoRef.current,
+          (result: any) => {
+            console.log('🎯 QR détecté Safari:', result.data)
+            setDebugInfo(`✅ QR Safari: ${result.data.substring(0, 20)}...`)
+            handleScanResult(result.data)
+          },
+          {
+            onDecodeError: (err: any) => {
+              console.log('Erreur décodage Safari:', err)
+            },
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            preferredCamera: facingMode === 'environment' ? 'environment' : 'user'
+          }
+        )
+
+        setQrScanner(scanner)
+        await scanner.start()
+        setIsScanning(true)
+        setDebugInfo('🍎 Scanner Safari actif')
+      }
+      
+    } catch (err: any) {
+      console.error('Erreur scanner Safari:', err)
+      setError(`Erreur Safari: ${err.message}`)
+      setDebugInfo('❌ Erreur scanner Safari')
+    }
+  }
+
   const startCamera = async () => {
     try {
       setError('')
-      setDebugInfo('🎥 Démarrage caméra...')
+      setDebugInfo('🎥 Démarrage caméra standard...')
       
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setError('Caméra non supportée par ce navigateur')
@@ -74,7 +121,6 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
       clearInterval(scanIntervalRef.current)
     }
 
-    // Test support BarcodeDetector
     const hasBarcode = 'BarcodeDetector' in window
     setDebugInfo(`🔍 Scan actif (BarcodeDetector: ${hasBarcode ? '✅' : '❌'})`)
     
@@ -96,7 +142,6 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
 
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
-
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
     try {
@@ -118,7 +163,6 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             console.log('Erreur BarcodeDetector:', error)
           })
       } else {
-        // Fallback: analyse basique
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
         analyzeImageData(imageData)
       }
@@ -151,6 +195,12 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   }
 
   const stopCamera = () => {
+    if (qrScanner) {
+      qrScanner.stop()
+      qrScanner.destroy()
+      setQrScanner(null)
+    }
+
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current)
       scanIntervalRef.current = null
@@ -178,7 +228,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   }
 
   const handleScanResult = (data: string) => {
-    console.log('🎯 QR Code traité:', data)
+    console.log('�� QR Code traité:', data)
     console.log('👤 Type utilisateur:', userType)
     
     try {
@@ -204,6 +254,11 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
           const profilePath = `/client/${userId}`
           console.log('👤 Navigation vers profil client:', profilePath)
           navigate(profilePath)
+        } else if (data.includes('/client/')) {
+          // Format URL : https://site.com/client/123
+          const path = data.replace(/^.*?(\/client\/.*)$/, '$1')
+          console.log('👤 Navigation vers profil client (URL):', path)
+          navigate(path)
         } else if (data.startsWith('QR_')) {
           const parts = data.split('_')
           if (parts.length >= 2) {
@@ -215,7 +270,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             alert('❌ Format QR invalide')
           }
         } else {
-          alert('❌ QR Code client non reconnu. Format attendu: SKIPLINE_USER_XXX ou QR_XXX')
+          alert('❌ QR Code client non reconnu. Formats acceptés: SKIPLINE_USER_XXX, /client/XXX ou QR_XXX')
           console.log('❌ Données reçues:', data)
         }
       }
@@ -254,28 +309,30 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             autoPlay
           />
           
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-48 h-48">
-                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
-                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
-                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
-                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
-                
-                {isScanning && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-40 h-0.5 bg-blue-500 animate-pulse"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="absolute inset-0 bg-black/40">
+          {!isSafari && (
+            <div className="absolute inset-0 pointer-events-none">
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 bg-transparent border-2 border-transparent rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"></div>
+                <div className="relative w-48 h-48">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+                  
+                  {isScanning && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-40 h-0.5 bg-blue-500 animate-pulse"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="absolute inset-0 bg-black/40">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-48 h-48 bg-transparent border-2 border-transparent rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"></div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {!isScanning && !error && (
             <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
@@ -291,7 +348,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
               <div className="text-center text-white p-4">
                 <p className="font-medium mb-2">{error}</p>
                 <button
-                  onClick={startCamera}
+                  onClick={isSafari ? startSafariScanner : startCamera}
                   className="px-4 py-2 bg-white/20 rounded-lg text-sm hover:bg-white/30 transition-colors"
                 >
                   Réessayer
@@ -316,6 +373,9 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
                 : 'Scannez le QR code du client'
               }
             </p>
+            {isSafari && (
+              <p className="text-xs text-blue-600">🍎 Mode Safari optimisé</p>
+            )}
           </div>
 
           <div className="flex space-x-3">
