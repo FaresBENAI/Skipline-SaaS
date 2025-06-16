@@ -48,14 +48,16 @@ const JoinQueue: React.FC = () => {
     try {
       console.log('🔍 Recherche entreprise avec code:', companyCode)
       
+      // CORRECTION: Chercher avec LIKE pour correspondre au format COMPANY_ABC123_timestamp
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .select('id, name, description')
-        .eq('company_qr_code', companyCode)
+        .like('company_qr_code', `COMPANY_${companyCode}_%`)
         .eq('is_active', true)
         .single()
 
       if (companyError || !companyData) {
+        console.error('Erreur recherche entreprise:', companyError)
         setError('Entreprise non trouvée ou inactive')
         return
       }
@@ -186,6 +188,11 @@ const JoinQueue: React.FC = () => {
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Entreprise introuvable</h1>
           <p className="text-gray-600 mb-6">{error}</p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-yellow-800">
+              <strong>Debug:</strong> Code recherché: {companyCode}
+            </p>
+          </div>
           <button
             onClick={() => navigate('/')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center space-x-2 mx-auto"
@@ -282,7 +289,7 @@ const JoinQueue: React.FC = () => {
                       </div>
                     </div>
                     {selectedQueue?.id === queue.id && (
-                      <CheckCircle className="w-6 h-6 text-blue-600" />
+                      <CheckCircle className="w-6 w-6 text-blue-600" />
                     )}
                   </div>
                 </div>
