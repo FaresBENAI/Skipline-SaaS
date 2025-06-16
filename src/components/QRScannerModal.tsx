@@ -17,6 +17,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   const [error, setError] = useState<string>('')
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment')
+  const [debugInfo, setDebugInfo] = useState<string>('')
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -32,6 +33,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
   const startCamera = async () => {
     try {
       setError('')
+      setDebugInfo('🎥 Démarrage caméra...')
       
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setError('Caméra non supportée par ce navigateur')
@@ -57,6 +59,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
         videoRef.current.srcObject = mediaStream
         await videoRef.current.play()
         setIsScanning(true)
+        setDebugInfo('📸 Caméra prête, scan en cours...')
         startQRDetection()
       }
       
@@ -71,6 +74,10 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
       clearInterval(scanIntervalRef.current)
     }
 
+    // Test support BarcodeDetector
+    const hasBarcode = 'BarcodeDetector' in window
+    setDebugInfo(`🔍 Scan actif (BarcodeDetector: ${hasBarcode ? '✅' : '❌'})`)
+    
     scanIntervalRef.current = setInterval(() => {
       scanForQRCode()
     }, 500)
@@ -102,14 +109,16 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
           .then((barcodes: any[]) => {
             if (barcodes.length > 0) {
               const qrData = barcodes[0].rawValue
-              console.log('🔍 QR détecté:', qrData)
+              console.log('🎯 QR détecté via BarcodeDetector:', qrData)
+              setDebugInfo(`✅ QR trouvé: ${qrData.substring(0, 20)}...`)
               handleScanResult(qrData)
             }
           })
           .catch((error: any) => {
-            console.log('Erreur détection:', error)
+            console.log('Erreur BarcodeDetector:', error)
           })
       } else {
+        // Fallback: analyse basique
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
         analyzeImageData(imageData)
       }
@@ -136,7 +145,8 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
     const ratio = darkPixels / (data.length / 4)
     
     if (ratio > 0.1 && ratio < 0.7) {
-      console.log('Pattern QR possible détecté, ratio:', ratio)
+      console.log('🔍 Pattern possible détecté (fallback), ratio:', ratio)
+      setDebugInfo(`🔍 Pattern détecté: ${(ratio * 100).toFixed(1)}%`)
     }
   }
 
@@ -151,6 +161,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
       setStream(null)
     }
     setIsScanning(false)
+    setDebugInfo('')
   }
 
   const switchCamera = () => {
@@ -161,6 +172,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
     const qrContent = prompt('Entrez le contenu du QR Code (ex: SKIPLINE_USER_123):')
     if (qrContent) {
       console.log('🔍 QR saisi manuellement:', qrContent)
+      setDebugInfo(`✅ Manuel: ${qrContent}`)
       handleScanResult(qrContent)
     }
   }
@@ -186,17 +198,16 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
           alert('❌ QR Code entreprise non reconnu')
         }
       } else {
-        // Entreprise scanne QR client - NOUVEAUX FORMATS
+        // Entreprise scanne QR client
         if (data.startsWith('SKIPLINE_USER_')) {
           const userId = data.replace('SKIPLINE_USER_', '')
           const profilePath = `/client/${userId}`
           console.log('👤 Navigation vers profil client:', profilePath)
           navigate(profilePath)
         } else if (data.startsWith('QR_')) {
-          // Format de la base : QR_xxxxx_timestamp
           const parts = data.split('_')
           if (parts.length >= 2) {
-            const userId = parts[1] // Récupérer l'ID après QR_
+            const userId = parts[1]
             const profilePath = `/client/${userId}`
             console.log('👤 Navigation vers profil client (format DB):', profilePath)
             navigate(profilePath)
@@ -247,7 +258,7 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-48 h-48">
                 <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
-                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tl-lg"></div>
+                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
                 <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
                 <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
                 
@@ -288,6 +299,13 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
               </div>
             </div>
           )}
+
+          {/* Debug info overlay */}
+          {debugInfo && (
+            <div className="absolute top-2 left-2 right-2 bg-black/70 text-white text-xs p-2 rounded">
+              {debugInfo}
+            </div>
+          )}
         </div>
 
         <div className="p-4 space-y-4">
@@ -322,7 +340,10 @@ const QRScannerModal = ({ isOpen, onClose, userType }: QRScannerModalProps) => {
               Caméra {facingMode === 'environment' ? 'arrière' : 'frontale'} active
             </p>
             {isScanning && (
-              <p className="text-xs text-green-600 mt-1">�� Scan en cours...</p>
+              <p className="text-xs text-green-600 mt-1">🔍 Scan en cours...</p>
+            )}
+            {debugInfo && (
+              <p className="text-xs text-blue-600 mt-1">{debugInfo}</p>
             )}
           </div>
         </div>
