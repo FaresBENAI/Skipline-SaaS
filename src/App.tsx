@@ -9,6 +9,7 @@ import ClientProfile from './pages/ClientProfile'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import JoinQueue from './pages/JoinQueue'
+import QRScanner from './pages/QRScanner'
 import ProtectedRoute from './components/ProtectedRoute'
 import './index.css'
 
@@ -30,6 +31,9 @@ const AppRoutes = () => {
         path="/auth"
         element={user ? <Navigate to={getDashboardRoute()} replace /> : <AuthPage />}
       />
+      
+      {/* Route Scanner Publique */}
+      <Route path="/scanner" element={<QRScanner />} />
       
       {/* Routes Client */}
       <Route
