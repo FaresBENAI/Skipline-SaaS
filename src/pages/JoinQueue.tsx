@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { NotificationService } from '../services/notificationService'
 import { Building2, Users, Clock, Mail, Phone, User, Loader2, CheckCircle, AlertCircle, Home, ArrowLeft } from 'lucide-react'
 
 interface Company {
@@ -102,7 +103,7 @@ const JoinQueue: React.FC = () => {
   }
 
   const joinQueue = async () => {
-    if (!selectedQueue) return
+    if (!selectedQueue || !company) return
 
     if (!user && !guestForm.email && !guestForm.phone) {
       setError('Veuillez fournir votre email ou téléphone')
@@ -113,6 +114,9 @@ const JoinQueue: React.FC = () => {
     setError('')
 
     try {
+      console.log('🎯 Début ajout à la file...')
+
+      // Calculer la position
       const { count } = await supabase
         .from('queue_entries')
         .select('*', { count: 'exact', head: true })
@@ -120,38 +124,111 @@ const JoinQueue: React.FC = () => {
         .in('status', ['waiting', 'called'])
 
       const position = (count || 0) + 1
+      const estimatedWait = position * selectedQueue.estimated_time_per_person
 
-      const entryData: any = {
-        queue_id: selectedQueue.id,
-        position: position,
-        status: 'waiting'
-      }
+      console.log('📍 Position calculée:', position)
 
       if (user) {
-        entryData.user_id = user.id
+        // Utilisateur connecté - insertion normale
+        const { error: insertError } = await supabase
+          .from('queue_entries')
+          .insert({
+            queue_id: selectedQueue.id,
+            user_id: user.id,
+            position: position,
+            status: 'waiting',
+            estimated_time: estimatedWait
+          })
+
+        if (insertError) {
+          console.error('❌ Erreur insertion utilisateur:', insertError)
+          throw new Error(`Erreur DB: ${insertError.message}`)
+        }
+
+        console.log('✅ Utilisateur ajouté à la file')
+
+        // Notification pour utilisateur connecté
+        try {
+          await NotificationService.notifyQueueJoined(
+            user.id,
+            user.email || '',
+            user.user_metadata?.full_name || 'Client',
+            company.name,
+            selectedQueue.name,
+            position,
+            estimatedWait
+          )
+          console.log('📧 Notification envoyée')
+        } catch (notifError) {
+          console.error('⚠️ Erreur notification:', notifError)
+        }
+
       } else {
-        entryData.guest_email = guestForm.email || null
-        entryData.guest_phone = guestForm.phone || null
-        entryData.guest_name = guestForm.name || null
+        // Visiteur non-connecté - créer un profil temporaire
+        console.log('👤 Création profil visiteur...')
+        
+        const { data: tempProfile, error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            email: guestForm.email || null,
+            phone: guestForm.phone || null,
+            full_name: guestForm.name || 'Visiteur',
+            user_type: 'client'
+          })
+          .select()
+          .single()
+
+        if (profileError) {
+          console.error('❌ Erreur création profil:', profileError)
+          throw new Error(`Erreur profil: ${profileError.message}`)
+        }
+
+        console.log('✅ Profil visiteur créé:', tempProfile.id)
+
+        // Ajouter à la file avec l'ID du profil temporaire
+        const { error: insertError } = await supabase
+          .from('queue_entries')
+          .insert({
+            queue_id: selectedQueue.id,
+            user_id: tempProfile.id,
+            position: position,
+            status: 'waiting',
+            estimated_time: estimatedWait
+          })
+
+        if (insertError) {
+          console.error('❌ Erreur insertion visiteur:', insertError)
+          throw new Error(`Erreur ajout file: ${insertError.message}`)
+        }
+
+        console.log('✅ Visiteur ajouté à la file')
+
+        // Notification pour visiteur
+        if (guestForm.email) {
+          try {
+            await NotificationService.notifyQueueJoined(
+              tempProfile.id,
+              guestForm.email,
+              guestForm.name || 'Visiteur',
+              company.name,
+              selectedQueue.name,
+              position,
+              estimatedWait,
+              guestForm.phone || undefined
+            )
+            console.log('📧 Notification visiteur envoyée')
+          } catch (notifError) {
+            console.error('⚠️ Erreur notification visiteur:', notifError)
+          }
+        }
       }
 
-      const { error: insertError } = await supabase
-        .from('queue_entries')
-        .insert(entryData)
+      setSuccess(`�� Parfait ! Vous êtes en position ${position} dans la file "${selectedQueue.name}". Temps d'attente estimé: ${estimatedWait} minutes.`)
 
-      if (insertError) {
-        console.error('Erreur insertion:', insertError)
-        setError('Erreur lors de l\'ajout à la file')
-        return
-      }
-
-      const estimatedWait = selectedQueue.current_waiting * selectedQueue.estimated_time_per_person
-
-      setSuccess(`🎉 Parfait ! Vous êtes en position ${position} dans la file "${selectedQueue.name}". Temps d'attente estimé: ${estimatedWait} minutes.`)
-
-    } catch (err) {
-      console.error('Erreur joinQueue:', err)
-      setError('Erreur technique lors de l\'ajout')
+    } catch (err: any) {
+      console.error('❌ Erreur joinQueue:', err)
+      setError(err.message || 'Erreur technique lors de l\'ajout')
     } finally {
       setJoining(false)
     }
@@ -289,7 +366,7 @@ const JoinQueue: React.FC = () => {
                       </div>
                     </div>
                     {selectedQueue?.id === queue.id && (
-                      <CheckCircle className="w-6 w-6 text-blue-600" />
+                      <CheckCircle className="w-6 h-6 text-blue-600" />
                     )}
                   </div>
                 </div>
