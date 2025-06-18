@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { NotificationService } from '../services/notificationService'
 import { ArrowLeft, Bell, Users, CheckCircle, Clock } from 'lucide-react'
 
 interface Queue {
@@ -9,6 +10,9 @@ interface Queue {
   name: string
   company_id: string
   is_active: boolean
+  companies?: {
+    name: string
+  }
 }
 
 interface QueueEntry {
@@ -18,6 +22,7 @@ interface QueueEntry {
   user: {
     full_name: string
     email: string
+    phone?: string
   }
   created_at: string
 }
@@ -30,6 +35,7 @@ const QueueManagement = () => {
   const [queue, setQueue] = useState<Queue | null>(null)
   const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [calling, setCalling] = useState(false)
 
   useEffect(() => {
     if (queueId && user) {
@@ -46,7 +52,10 @@ const QueueManagement = () => {
     try {
       const { data, error } = await supabase
         .from('queues')
-        .select('*')
+        .select(`
+          *,
+          companies(name)
+        `)
         .eq('id', queueId)
         .single()
 
@@ -69,7 +78,7 @@ const QueueManagement = () => {
         .from('queue_entries')
         .select(`
           *,
-          user:profiles(full_name, email)
+          user:profiles(full_name, email, phone)
         `)
         .eq('queue_id', queueId)
         .in('status', ['waiting', 'called'])
@@ -92,34 +101,71 @@ const QueueManagement = () => {
 
   const callNext = async () => {
     const nextEntry = queueEntries.find(entry => entry.status === 'waiting')
-    if (!nextEntry) return
+    if (!nextEntry) {
+      alert('Aucun client en attente')
+      return
+    }
 
+    setCalling(true)
+    
     try {
-      const { error } = await supabase
+      console.log('🔄 Appel du client suivant:', nextEntry.user?.full_name)
+      
+      // Mettre à jour le statut vers 'called' (SANS called_at qui n'existe pas)
+      const { error: updateError } = await supabase
         .from('queue_entries')
         .update({ 
           status: 'called',
-          called_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', nextEntry.id)
 
-      if (error) throw error
+      if (updateError) {
+        console.error('❌ Erreur mise à jour statut:', updateError)
+        throw updateError
+      }
+
+      console.log('✅ Statut mis à jour vers "called"')
+
+      // Envoyer notification si possible
+      if (nextEntry.user?.email && queue?.companies?.name) {
+        try {
+          console.log('📧 Envoi notification appel...')
+          
+          await NotificationService.notifyQueueCalled(
+            nextEntry.id, // user_id manquant, on utilise entry id temporairement
+            nextEntry.user.email,
+            nextEntry.user.full_name || 'Client',
+            queue.companies.name,
+            queue.name,
+            nextEntry.user.phone
+          )
+          
+          console.log('✅ Notification envoyée')
+        } catch (notifError) {
+          console.error('⚠️ Erreur notification (non bloquante):', notifError)
+        }
+      }
 
       alert(`📢 ${nextEntry.user?.full_name || nextEntry.user?.email || 'Client'} appelé(e) !`)
       fetchQueueEntries()
+      
     } catch (error) {
-      console.error('Erreur appel client:', error)
-      alert('Erreur lors de l\'appel du client')
+      console.error('❌ Erreur appel client:', error)
+      alert('Erreur lors de l\'appel du client: ' + (error.message || 'Erreur inconnue'))
+    } finally {
+      setCalling(false)
     }
   }
 
   const markServed = async (entryId: string) => {
     try {
+      // Mettre à jour vers 'served' (SANS served_at qui n'existe pas)
       const { error } = await supabase
         .from('queue_entries')
         .update({ 
           status: 'served',
-          served_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', entryId)
 
@@ -127,7 +173,7 @@ const QueueManagement = () => {
       fetchQueueEntries()
     } catch (error) {
       console.error('Erreur marquage servi:', error)
-      alert('Erreur lors du marquage')
+      alert('Erreur lors du marquage: ' + (error.message || 'Erreur inconnue'))
     }
   }
 
@@ -177,11 +223,11 @@ const QueueManagement = () => {
             </div>
             <button
               onClick={callNext}
-              disabled={queueEntries.filter(e => e.status === 'waiting').length === 0}
+              disabled={queueEntries.filter(e => e.status === 'waiting').length === 0 || calling}
               className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Bell className="w-5 h-5" />
-              <span>Appeler suivant</span>
+              <span>{calling ? 'Appel en cours...' : 'Appeler suivant'}</span>
             </button>
           </div>
         </div>
