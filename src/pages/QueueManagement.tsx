@@ -109,30 +109,38 @@ const QueueManagement = () => {
     setCalling(true)
     
     try {
-      console.log('🔄 Appel du client suivant:', nextEntry.user?.full_name)
+      console.log('🔄 Début appel client:', {
+        entryId: nextEntry.id,
+        userName: nextEntry.user?.full_name,
+        userEmail: nextEntry.user?.email,
+        queueId: queueId
+      })
       
-      // Mettre à jour le statut vers 'called'
-      const { error: updateError } = await supabase
+      // Étape 1: Mettre à jour le statut vers 'called'
+      console.log('📝 Mise à jour statut...')
+      const { data: updateData, error: updateError } = await supabase
         .from('queue_entries')
         .update({ 
-          status: 'called',
-          updated_at: new Date().toISOString()
+          status: 'called'
         })
         .eq('id', nextEntry.id)
+        .select()
+
+      console.log('📝 Résultat mise à jour:', { updateData, updateError })
 
       if (updateError) {
-        console.error('❌ Erreur mise à jour statut:', updateError)
-        throw updateError
+        console.error('❌ Erreur UPDATE:', updateError)
+        throw new Error(`Erreur DB: ${updateError.message || 'Inconnue'}`)
       }
 
       console.log('✅ Statut mis à jour vers "called"')
 
-      // Envoyer notification si possible
+      // Étape 2: Notification (optionnelle)
       if (nextEntry.user?.email && queue?.companies?.name) {
         try {
-          console.log('📧 Envoi notification appel...')
+          console.log('📧 Tentative notification...')
           
-          await NotificationService.notifyQueueCalled(
+          const notifResult = await NotificationService.notifyQueueCalled(
             nextEntry.id,
             nextEntry.user.email,
             nextEntry.user.full_name || 'Client',
@@ -141,19 +149,38 @@ const QueueManagement = () => {
             nextEntry.user.phone
           )
           
-          console.log('✅ Notification envoyée')
+          console.log('✅ Notification résultat:', notifResult)
         } catch (notifError) {
           console.error('⚠️ Erreur notification (non bloquante):', notifError)
+          // Ne pas faire échouer le processus pour la notification
         }
+      } else {
+        console.log('⚠️ Notification non envoyée:', {
+          hasEmail: !!nextEntry.user?.email,
+          hasCompanyName: !!queue?.companies?.name
+        })
       }
 
+      // Étape 3: Succès
       alert(`📢 ${nextEntry.user?.full_name || nextEntry.user?.email || 'Client'} appelé(e) !`)
-      fetchQueueEntries()
+      await fetchQueueEntries() // Recharger la liste
       
     } catch (error) {
-      console.error('❌ Erreur appel client:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
-      alert('Erreur lors de l\'appel du client: ' + errorMessage)
+      console.error('❌ ERREUR COMPLÈTE:', error)
+      console.error('❌ ERREUR TYPE:', typeof error)
+      console.error('❌ ERREUR STACK:', error)
+      
+      let errorMessage = 'Erreur inconnue'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        errorMessage = JSON.stringify(error)
+      }
+      
+      alert('ERREUR DÉTAILLÉE: ' + errorMessage)
     } finally {
       setCalling(false)
     }
@@ -164,8 +191,7 @@ const QueueManagement = () => {
       const { error } = await supabase
         .from('queue_entries')
         .update({ 
-          status: 'served',
-          updated_at: new Date().toISOString()
+          status: 'served'
         })
         .eq('id', entryId)
 
