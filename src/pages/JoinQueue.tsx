@@ -19,6 +19,15 @@ interface Queue {
   current_waiting: number
 }
 
+// Fonction pour générer un UUID valide
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 const JoinQueue: React.FC = () => {
   const { companyCode } = useParams<{ companyCode: string }>()
   const { user } = useAuth()
@@ -49,7 +58,6 @@ const JoinQueue: React.FC = () => {
     try {
       console.log('🔍 Recherche entreprise avec code:', companyCode)
       
-      // CORRECTION: Chercher avec LIKE pour correspondre au format COMPANY_ABC123_timestamp
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .select('id, name, description')
@@ -164,13 +172,15 @@ const JoinQueue: React.FC = () => {
         }
 
       } else {
-        // Visiteur non-connecté - créer un profil temporaire
-        console.log('👤 Création profil visiteur...')
+        // Visiteur non-connecté - créer un profil temporaire avec UUID valide
+        console.log('�� Création profil visiteur...')
+        
+        const guestId = generateUUID() // UUID valide au lieu de "guest-xxx"
         
         const { data: tempProfile, error: profileError } = await supabase
           .from('profiles')
           .insert({
-            id: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: guestId,
             email: guestForm.email || null,
             phone: guestForm.phone || null,
             full_name: guestForm.name || 'Visiteur',
@@ -224,7 +234,7 @@ const JoinQueue: React.FC = () => {
         }
       }
 
-      setSuccess(`�� Parfait ! Vous êtes en position ${position} dans la file "${selectedQueue.name}". Temps d'attente estimé: ${estimatedWait} minutes.`)
+      setSuccess(`🎉 Parfait ! Vous êtes en position ${position} dans la file "${selectedQueue.name}". Temps d'attente estimé: ${estimatedWait} minutes.`)
 
     } catch (err: any) {
       console.error('❌ Erreur joinQueue:', err)
