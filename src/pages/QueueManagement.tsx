@@ -111,7 +111,7 @@ const QueueManagement = () => {
     try {
       console.log('🔄 Appel du client suivant:', nextEntry.user?.full_name)
       
-      // Mettre à jour le statut vers 'called' (SANS called_at qui n'existe pas)
+      // Mettre à jour le statut vers 'called'
       const { error: updateError } = await supabase
         .from('queue_entries')
         .update({ 
@@ -133,7 +133,7 @@ const QueueManagement = () => {
           console.log('📧 Envoi notification appel...')
           
           await NotificationService.notifyQueueCalled(
-            nextEntry.id, // user_id manquant, on utilise entry id temporairement
+            nextEntry.id,
             nextEntry.user.email,
             nextEntry.user.full_name || 'Client',
             queue.companies.name,
@@ -152,7 +152,8 @@ const QueueManagement = () => {
       
     } catch (error) {
       console.error('❌ Erreur appel client:', error)
-      alert('Erreur lors de l\'appel du client: ' + (error.message || 'Erreur inconnue'))
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
+      alert('Erreur lors de l\'appel du client: ' + errorMessage)
     } finally {
       setCalling(false)
     }
@@ -160,7 +161,6 @@ const QueueManagement = () => {
 
   const markServed = async (entryId: string) => {
     try {
-      // Mettre à jour vers 'served' (SANS served_at qui n'existe pas)
       const { error } = await supabase
         .from('queue_entries')
         .update({ 
@@ -173,7 +173,8 @@ const QueueManagement = () => {
       fetchQueueEntries()
     } catch (error) {
       console.error('Erreur marquage servi:', error)
-      alert('Erreur lors du marquage: ' + (error.message || 'Erreur inconnue'))
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
+      alert('Erreur lors du marquage: ' + errorMessage)
     }
   }
 
