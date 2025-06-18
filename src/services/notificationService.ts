@@ -96,8 +96,8 @@ export class NotificationService {
       const subject = this.replaceTemplate(template.subject, data);
       const html = this.replaceTemplate(template.html, data);
 
-      // Utiliser Supabase Edge Function ou service tiers
-      const { data: emailResult, error } = await supabase.functions.invoke('send-email', {
+      // Utiliser Supabase Edge Function
+      const { error } = await supabase.functions.invoke('send-email', {
         body: {
           to: data.email,
           subject,
@@ -132,8 +132,8 @@ export class NotificationService {
 
       const message = this.replaceTemplate(template, data);
 
-      // Utiliser Supabase Edge Function ou service tiers (Twilio, etc.)
-      const { data: smsResult, error } = await supabase.functions.invoke('send-sms', {
+      // Utiliser Supabase Edge Function
+      const { error } = await supabase.functions.invoke('send-sms', {
         body: {
           to: data.phone,
           message,
