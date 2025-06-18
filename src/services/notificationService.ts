@@ -9,7 +9,7 @@ export interface NotificationData {
   queueName: string;
   position?: number;
   estimatedTime?: number;
-  type: 'queue_joined' | 'queue_called' | 'position_updated' | 'queue_cancelled';
+  type: 'queue_joined' | 'queue_called' | 'position_updated';
 }
 
 export class NotificationService {
@@ -68,9 +68,8 @@ export class NotificationService {
   // Templates SMS
   private static smsTemplates = {
     queue_joined: '🎯 SkipLine: Vous êtes en position {{position}} chez {{companyName}}. Temps estimé: {{estimatedTime}}min. Nous vous préviendrons !',
-    queue_called: '�� SkipLine: C\'est votre tour chez {{companyName}} ! Présentez-vous au comptoir maintenant.',
-    position_updated: '📊 SkipLine: Nouvelle position {{position}} chez {{companyName}}. Temps estimé: {{estimatedTime}}min.',
-    queue_cancelled: '❌ SkipLine: Votre file chez {{companyName}} a été annulée. Désolé pour le dérangement.'
+    queue_called: '🚀 SkipLine: C\'est votre tour chez {{companyName}} ! Présentez-vous au comptoir maintenant.',
+    position_updated: '📊 SkipLine: Nouvelle position {{position}} chez {{companyName}}. Temps estimé: {{estimatedTime}}min.'
   };
 
   // Remplacer les variables dans le template
@@ -98,7 +97,7 @@ export class NotificationService {
       const html = this.replaceTemplate(template.html, data);
 
       // Utiliser Supabase Edge Function ou service tiers
-      const { data: result, error } = await supabase.functions.invoke('send-email', {
+      const { data: emailResult, error } = await supabase.functions.invoke('send-email', {
         body: {
           to: data.email,
           subject,
@@ -134,7 +133,7 @@ export class NotificationService {
       const message = this.replaceTemplate(template, data);
 
       // Utiliser Supabase Edge Function ou service tiers (Twilio, etc.)
-      const { data: result, error } = await supabase.functions.invoke('send-sms', {
+      const { data: smsResult, error } = await supabase.functions.invoke('send-sms', {
         body: {
           to: data.phone,
           message,
