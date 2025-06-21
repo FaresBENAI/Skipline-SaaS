@@ -1,8 +1,3 @@
-// ===========================================
-// SCANNER ENTREPRISE POUR WORKFLOW 2
-// À coller dans src/components/BusinessScanner.tsx
-// ===========================================
-
 import React, { useState, useEffect } from 'react';
 import { businessScanClient, detectQRCodeType } from '../services/queueWorkflowService';
 import QRScannerModal from './QRScannerModal';
@@ -24,7 +19,6 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    // Sélectionner la première file par défaut
     if (queues.length > 0 && !selectedQueue) {
       setSelectedQueue(queues[0].id);
     }
@@ -35,35 +29,31 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
       setScanning(true);
       setError('');
       
-      console.log('🔍 QR Code détecté par entreprise:', qrCode);
+      console.log('QR Code détecté par entreprise:', qrCode);
       
-      // Détecter le type de QR code
       const qrType = detectQRCodeType(qrCode);
-      console.log('📋 Type QR détecté:', qrType);
+      console.log('Type QR détecté:', qrType);
       
       if (qrType.type !== 'client') {
-        throw new Error('Ce QR code n\\'est pas un QR code client valide');
+        throw new Error('Ce QR code nest pas un QR code client valide');
       }
       
       if (!selectedQueue) {
-        throw new Error('Veuillez sélectionner une file d\\'attente');
+        throw new Error('Veuillez sélectionner une file attente');
       }
       
-      // Scanner le client et l'ajouter à la file
       const result = await businessScanClient(qrCode, selectedQueue);
       
-      console.log('✅ Client ajouté avec succès:', result);
+      console.log('Client ajouté avec succès:', result);
       setLastScanResult(result);
       setShowScanner(false);
       
-      // Callback pour notifier le parent
       onClientAdded?.(result);
       
-      // Notification de succès
-      alert(`✅ Client "${result.client_name}" ajouté à la file "${result.queue_name}"\\nPosition: ${result.position}`);
+      alert(`Client "${result.client_name}" ajouté à la file "${result.queue_name}"\nPosition: ${result.position}`);
       
     } catch (error: any) {
-      console.error('❌ Erreur scan client:', error);
+      console.error('Erreur scan client:', error);
       setError(error.message || 'Erreur lors du scan du client');
     } finally {
       setScanning(false);
@@ -72,7 +62,7 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
 
   const openScanner = () => {
     if (!selectedQueue) {
-      setError('Veuillez sélectionner une file d\\'attente avant de scanner');
+      setError('Veuillez sélectionner une file attente avant de scanner');
       return;
     }
     setError('');
@@ -90,7 +80,6 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
         Scannez le QR code d'un client pour l'ajouter directement à une file d'attente
       </p>
       
-      {/* Sélection de file */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           File d'attente de destination
@@ -109,14 +98,12 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
         </select>
       </div>
       
-      {/* Erreur */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-600 text-sm">{error}</p>
         </div>
       )}
       
-      {/* Dernier scan */}
       {lastScanResult && (
         <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center text-green-600 mb-2">
@@ -132,7 +119,6 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
         </div>
       )}
       
-      {/* Bouton scanner */}
       <button
         onClick={openScanner}
         disabled={!selectedQueue || scanning}
@@ -151,24 +137,6 @@ export default function BusinessScanner({ queues, onClientAdded }: BusinessScann
         )}
       </button>
       
-      {/* Instructions */}
-      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-        <div className="flex items-start">
-          <span className="text-blue-600 text-xl mr-3">💡</span>
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">Instructions :</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Sélectionnez d'abord la file de destination</li>
-              <li>Demandez au client de vous montrer son QR code SkipLine</li>
-              <li>Scannez le code avec l'appareil photo</li>
-              <li>Le client sera automatiquement ajouté à la file</li>
-              <li>Il recevra une notification de confirmation</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      
-      {/* Modal Scanner */}
       {showScanner && (
         <QRScannerModal
           isOpen={showScanner}

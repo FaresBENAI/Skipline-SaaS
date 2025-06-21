@@ -1,11 +1,5 @@
-// ===========================================
-// SERVICE TRIPLE WORKFLOW SKIPLINE v2.8
-// À coller dans src/services/queueWorkflowService.ts
-// ===========================================
-
 import { supabase } from '../lib/supabase';
 
-// Types pour les différents workflows
 export interface AuthenticatedClientJoinResult {
   user_id: string;
   user_name: string;
@@ -44,17 +38,13 @@ export interface VisitorJoinResult {
   entry_method: 'visitor_form';
 }
 
-/**
- * WORKFLOW 1: Client authentifié scanne QR entreprise et rejoint file
- */
 export async function authenticatedClientJoinQueue(
   companyCode: string,
   queueId: string
 ): Promise<AuthenticatedClientJoinResult> {
   try {
-    console.log('�� Client authentifié rejoint file:', { companyCode, queueId });
+    console.log('Client authentifié rejoint file:', { companyCode, queueId });
     
-    // Vérifier que l'utilisateur est connecté
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       throw new Error('Vous devez être connecté pour rejoindre une file');
@@ -68,32 +58,28 @@ export async function authenticatedClientJoinQueue(
       });
 
     if (error) {
-      console.error('❌ Erreur client authentifié:', error);
-      throw new Error(error.message || 'Erreur lors de l\\'inscription à la file');
+      console.error('Erreur client authentifié:', error);
+      throw new Error(error.message || 'Erreur lors de inscription à la file');
     }
 
-    console.log('✅ Client authentifié inscrit:', data);
+    console.log('Client authentifié inscrit:', data);
     return data;
   } catch (error) {
-    console.error('❌ Erreur authenticatedClientJoinQueue:', error);
+    console.error('Erreur authenticatedClientJoinQueue:', error);
     throw error;
   }
 }
 
-/**
- * WORKFLOW 2: Entreprise scanne QR client et l'ajoute à une file
- */
 export async function businessScanClient(
   clientQrCode: string,
   queueId: string
 ): Promise<BusinessScanResult> {
   try {
-    console.log('🏢 Entreprise scanne client:', { clientQrCode, queueId });
+    console.log('Entreprise scanne client:', { clientQrCode, queueId });
     
-    // Vérifier que l'utilisateur est connecté en tant qu'entreprise
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error('Vous devez être connecté en tant qu\\'entreprise');
+      throw new Error('Vous devez être connecté en tant entreprise');
     }
 
     const { data, error } = await supabase
@@ -104,21 +90,18 @@ export async function businessScanClient(
       });
 
     if (error) {
-      console.error('❌ Erreur scan entreprise:', error);
+      console.error('Erreur scan entreprise:', error);
       throw new Error(error.message || 'Erreur lors du scan du client');
     }
 
-    console.log('✅ Client scanné et ajouté:', data);
+    console.log('Client scanné et ajouté:', data);
     return data;
   } catch (error) {
-    console.error('❌ Erreur businessScanClient:', error);
+    console.error('Erreur businessScanClient:', error);
     throw error;
   }
 }
 
-/**
- * WORKFLOW 3: Visiteur non-identifié remplit formulaire et rejoint file
- */
 export async function visitorJoinQueue(
   companyCode: string,
   queueId: string,
@@ -128,7 +111,7 @@ export async function visitorJoinQueue(
   ticketNumber?: string
 ): Promise<VisitorJoinResult> {
   try {
-    console.log('👤 Visiteur rejoint file:', { 
+    console.log('Visiteur rejoint file:', { 
       companyCode, queueId, contactValue, contactMethod, fullName, ticketNumber 
     });
 
@@ -143,24 +126,21 @@ export async function visitorJoinQueue(
       });
 
     if (error) {
-      console.error('❌ Erreur visiteur:', error);
-      throw new Error(error.message || 'Erreur lors de l\\'inscription visiteur');
+      console.error('Erreur visiteur:', error);
+      throw new Error(error.message || 'Erreur lors de inscription visiteur');
     }
 
-    console.log('✅ Visiteur inscrit:', data);
+    console.log('Visiteur inscrit:', data);
     return data;
   } catch (error) {
-    console.error('❌ Erreur visitorJoinQueue:', error);
+    console.error('Erreur visitorJoinQueue:', error);
     throw error;
   }
 }
 
-/**
- * Récupère les files d'attente d'une entreprise par son code
- */
 export async function getCompanyQueues(companyCode: string) {
   try {
-    console.log('🏢 Récupération files entreprise:', companyCode);
+    console.log('Récupération files entreprise:', companyCode);
 
     const { data: company, error: companyError } = await supabase
       .from('companies')
@@ -180,26 +160,22 @@ export async function getCompanyQueues(companyCode: string) {
       .single();
 
     if (companyError) {
-      console.error('❌ Entreprise non trouvée:', companyError);
+      console.error('Entreprise non trouvée:', companyError);
       throw new Error('Entreprise non trouvée');
     }
 
-    console.log('✅ Files récupérées:', company);
+    console.log('Files récupérées:', company);
     return company;
   } catch (error) {
-    console.error('❌ Erreur getCompanyQueues:', error);
+    console.error('Erreur getCompanyQueues:', error);
     throw error;
   }
 }
 
-/**
- * Détermine le type de QR code scanné
- */
 export function detectQRCodeType(qrCode: string): {
   type: 'company' | 'client' | 'visitor' | 'unknown';
   data: any;
 } {
-  // QR Entreprise: /join/COMPANY_123 ou COMPANY_123_timestamp
   if (qrCode.includes('/join/') || qrCode.startsWith('COMPANY_')) {
     const companyCode = qrCode.includes('/join/') 
       ? qrCode.split('/join/')[1]
@@ -211,7 +187,6 @@ export function detectQRCodeType(qrCode: string): {
     };
   }
   
-  // QR Client: SKIPLINE_USER_123 ou https://site.com/client/123
   if (qrCode.startsWith('SKIPLINE_USER_') || qrCode.includes('/client/')) {
     const userId = qrCode.startsWith('SKIPLINE_USER_')
       ? qrCode.replace('SKIPLINE_USER_', '')
@@ -223,7 +198,6 @@ export function detectQRCodeType(qrCode: string): {
     };
   }
   
-  // QR Visiteur: SKIPLINE_VISITOR_123
   if (qrCode.startsWith('SKIPLINE_VISITOR_')) {
     return {
       type: 'visitor',
@@ -237,30 +211,20 @@ export function detectQRCodeType(qrCode: string): {
   };
 }
 
-/**
- * Valide un email
- */
 export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
-/**
- * Valide un numéro de téléphone français
- */
 export function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^(\\+33|0)[1-9](\\d{8})$/;
-  return phoneRegex.test(phone.replace(/\\s/g, ''));
+  const phoneRegex = /^(\+33|0)[1-9](\d{8})$/;
+  return phoneRegex.test(phone.replace(/\s/g, ''));
 }
 
-/**
- * Nettoie et formate un numéro de téléphone
- */
 export function formatPhone(phone: string): string {
-  const cleaned = phone.replace(/\\s/g, '');
+  const cleaned = phone.replace(/\s/g, '');
   if (cleaned.startsWith('0')) {
     return '+33' + cleaned.substring(1);
   }
   return cleaned;
 }
-
